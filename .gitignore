@@ -1,0 +1,10 @@
+﻿/Demo/
+/txData/
+js/@fivem-nui/node_modules/
+js/@fivem-nui/coverage/
+js/@fivem-nui/dist/
+bin/
+obj/
+txData/
+js/@fivem-nui/package-lock.json
+FiveM.Nui.sln.DotSettings.user
