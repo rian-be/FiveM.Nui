@@ -1,0 +1,27 @@
+namespace FiveM.Nui.Abstractions.Diagnostics;
+
+/// <summary>
+/// Collects diagnostic metrics for the NUI pipeline.
+/// </summary>
+public interface INuiDiagnosticsCollector : INuiDiagnosticsProvider
+{
+    /// <summary>
+    /// Increments named counter.
+    /// </summary>
+    void IncrementCounter(string name);
+
+    /// <summary>
+    /// Records timing in milliseconds.
+    /// </summary>
+    void RecordTiming(string name, long milliseconds);
+
+    /// <summary>
+    /// Records payload size in bytes.
+    /// </summary>
+    void RecordPayload(int size);
+
+    /// <summary>
+    /// Resets all collected metrics to zero.
+    /// </summary>
+    void Reset();
+}
