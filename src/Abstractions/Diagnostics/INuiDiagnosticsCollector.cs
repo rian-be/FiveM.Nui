@@ -24,4 +24,10 @@ public interface INuiDiagnosticsCollector : INuiDiagnosticsProvider
     /// Resets all collected metrics to zero.
     /// </summary>
     void Reset();
+
+    /// <summary>
+    /// Logs the current metrics snapshot.
+    /// </summary>
+    /// <remarks>No-op when diagnostics are disabled.</remarks>
+    void LogSnapshot();
 }
