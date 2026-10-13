@@ -55,15 +55,16 @@ public partial class NuiClient
         {
             linkedCts.CancelAfter(timeout);
         }
-
-        // .NET 10: version-7 (time-ordered) GUIDs keep request ids sortable and
-        // index-friendly while staying globally unique.
+        
         var correlationId = Guid.CreateVersion7().ToString();
         var message = NuiMessage.CreateRequest(correlationId, eventName, request);
 
         EnsureWithinPayloadLimit(_serializer.Serialize(message).Length, eventName);
 
-        var tcs = new TaskCompletionSource<string>();
+        // RunContinuationsAsynchronously keeps the awaiting caller (and its
+        // continuation) off the transport/inbound thread that completes the
+        // response, so user code never runs inline on the callback thread.
+        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _requestManager.RegisterPendingRequest(correlationId, tcs);
 
         var startedAt = Environment.TickCount64;
@@ -89,6 +90,16 @@ public partial class NuiClient
         {
             _diagnostics.IncrementCounter("requests_cancelled");
             _logger.LogWarning("Request '{Event}' id={CorrelationId} canceled (client disposed)",
+                eventName, correlationId);
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The caller aborted their own token: a deliberate stop, not a
+            // deadline. Reporting it as a timeout would poison the timeout
+            // counter and mislead diagnosis.
+            _diagnostics.IncrementCounter("requests_cancelled");
+            _logger.LogWarning("Request '{Event}' id={CorrelationId} canceled by caller",
                 eventName, correlationId);
             throw;
         }
