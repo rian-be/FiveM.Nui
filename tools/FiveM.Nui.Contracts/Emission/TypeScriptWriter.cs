@@ -72,7 +72,7 @@ internal sealed class TypeScriptWriter(
             }
 
             builder.Append(options.Indent).Append(options.Indent)
-                .Append('\'').Append(@event.Name).Append("': { ")
+                .Append(ContractMembers.EscapeStringLiteral(@event.Name)).Append(": { ")
                 .Append(string.Join("; ", members)).Append(" };\n");
         }
 
