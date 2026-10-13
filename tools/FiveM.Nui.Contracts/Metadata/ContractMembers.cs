@@ -39,7 +39,7 @@ internal static class ContractMembers
     public static bool IsIgnored(PropertyInfo property)
     {
         var ignore = property.GetCustomAttribute<JsonIgnoreAttribute>();
-        return ignore is not null && ignore.Condition != JsonIgnoreCondition.Never;
+        return ignore is not null && ignore.Condition == JsonIgnoreCondition.Always;
     }
 
     /// <summary>
@@ -57,12 +57,41 @@ internal static class ContractMembers
     /// <c>[JsonStringEnumMemberName]</c> and otherwise the camelCase policy.
     /// </summary>
     /// <param name="field">The enum member.</param>
-    /// <returns>The quoted string literal.</returns>
+    /// <returns>The quoted and escaped string literal.</returns>
     public static string EnumLiteral(FieldInfo field)
     {
         var name = field.GetCustomAttribute<JsonStringEnumMemberNameAttribute>()?.Name
             ?? JsonNamingPolicy.CamelCase.ConvertName(field.Name);
 
-        return "'" + name + "'";
+        return EscapeStringLiteral(name);
+    }
+
+    /// <summary>
+    /// Escapes a string for use as a TypeScript string literal (single-quoted).
+    /// Escapes backslashes and single quotes to produce valid TypeScript syntax.
+    /// Also validates that the string doesn't contain control characters or newlines
+    /// which would make it invalid as a literal.
+    /// </summary>
+    /// <param name="value">The string value to escape.</param>
+    /// <returns>The quoted and escaped string literal.</returns>
+    /// <exception cref="InvalidOperationException">When the string contains invalid characters for a TypeScript literal.</exception>
+    public static string EscapeStringLiteral(string value)
+    {
+        // Check for control characters and newlines which would make the literal invalid
+        if (value.IndexOfAny(new[] { '\n', '\r', '\0' }) >= 0)
+        {
+            throw new InvalidOperationException(
+                $"String literal '{value}' contains control characters or newlines which are not valid in TypeScript string literals. " +
+                "Consider using a computed property name or escaping the value in the source."
+            );
+        }
+
+        // Escape backslashes and single quotes
+        // Order matters: escape backslashes first to avoid double-escaping
+        var escaped = value
+            .Replace("\\", "\\\\")
+            .Replace("'", "\\'");
+
+        return $"'{escaped}'";
     }
 }
