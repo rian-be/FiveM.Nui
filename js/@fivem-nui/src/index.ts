@@ -11,3 +11,10 @@ export { consoleNuiLogger, nullNuiLogger } from './logger';
 export type { NuiLogger } from './logger';
 export type { NuiDiagnostics } from './diagnostics';
 export type { NuiMessage, NuiError, NuiResult, NuiWindowAction } from './types';
+export type {
+  NuiEventMap,
+  NuiEventKey,
+  NuiEventRequest,
+  NuiEventResponse,
+  NuiEventPayload,
+} from './types';

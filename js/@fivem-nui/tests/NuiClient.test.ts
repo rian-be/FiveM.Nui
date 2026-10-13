@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+﻿import { describe, expect, it, vi } from 'vitest';
 import { NuiClient } from '../src/NuiClient';
 import { MessageTransport } from '../src/MessageTransport';
 import { NuiErrorCodes, NuiRequestError, isNuiRequestError } from '../src/errors';
@@ -489,6 +489,64 @@ describe('NuiClient lifecycle and diagnostics', () => {
   });
 });
 
+/**
+ * Type tests for NuiClient API.
+ * These tests use @ts-expect-error to verify that incorrect calls are rejected by TypeScript.
+ * They are not executed at runtime - they validate compile-time type checking.
+ */
+describe('NuiClient type safety', () => {
+  it('requires request payload for request events', async () => {
+    const { client } = makeClient();
+
+    // Event 'inventory:use' has a request type, so request() should require a payload
+    // @ts-expect-error: missing required request payload for 'inventory:use' event
+    client.request('inventory:use');
+  });
+
+  it('rejects wrong request payload type', async () => {
+    const { client } = makeClient();
+
+    // @ts-expect-error: wrong payload type for 'inventory:use' event
+    client.request('inventory:use', { wrongField: 'value' });
+  });
+
+  it('accepts correct request payload type', async () => {
+    const { client } = makeClient();
+
+    // This should compile: correct type for inventory:use request
+    const pending = client.request('inventory:use', { itemId: 'sword' });
+    expect(pending).toBeDefined();
+  });
+
+  it('sends undefined payload for request events', async () => {
+    const { client } = makeClient();
+
+    // Request events expect undefined payload when using send
+    client.send('inventory:use', undefined);
+  });
+
+  it('requires payload for payload events', async () => {
+    const { client } = makeClient();
+
+    // @ts-expect-error: missing required payload for payload event
+    client.send('player:healthChanged');
+  });
+
+  it('sends correct payload type for payload events', async () => {
+    const { client } = makeClient();
+
+    // This should compile: correct payload type
+    client.send('player:healthChanged', { health: 100 });
+  });
+
+  it('rejects wrong payload type for payload events', async () => {
+    const { client } = makeClient();
+
+    // @ts-expect-error: wrong payload type for 'player:healthChanged'
+    client.send('player:healthChanged', 'invalid string payload');
+  });
+});
+
 /** Minimal Window mock that records `message` listeners and dispatches synthetic events. */
 function mockWindow(): { window: Window; dispatch: (data: unknown) => void } {
   const listeners = new Set<EventListener>();
@@ -517,7 +575,7 @@ describe('NuiClient listen (FiveM SendNuiMessage delivers JSON string)', () => {
     const { window, dispatch } = mockWindow();
     client.listen(window);
 
-    // FiveM SendNuiMessage(string) → event.data is a JSON STRING, not an object
+    // FiveM SendNuiMessage(string) â†’ event.data is a JSON STRING, not an object
     dispatch(JSON.stringify({ type: 'event', event: 'player:data', payload: { health: 100 } }));
 
     expect(handler).toHaveBeenCalledWith({ health: 100 });
@@ -620,3 +678,4 @@ describe('NuiRequestError', () => {
     expect(error.message).toBe('TIMEOUT: po 30s');
   });
 });
+
