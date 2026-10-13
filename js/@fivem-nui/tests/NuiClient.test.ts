@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+﻿import { describe, expect, it, vi } from 'vitest';
 import { NuiClient } from '../src/NuiClient';
 import { MessageTransport } from '../src/MessageTransport';
 import { NuiErrorCodes, NuiRequestError, isNuiRequestError } from '../src/errors';
@@ -575,7 +575,7 @@ describe('NuiClient listen (FiveM SendNuiMessage delivers JSON string)', () => {
     const { window, dispatch } = mockWindow();
     client.listen(window);
 
-    // FiveM SendNuiMessage(string) → event.data is a JSON STRING, not an object
+    // FiveM SendNuiMessage(string) â†’ event.data is a JSON STRING, not an object
     dispatch(JSON.stringify({ type: 'event', event: 'player:data', payload: { health: 100 } }));
 
     expect(handler).toHaveBeenCalledWith({ health: 100 });
@@ -678,3 +678,4 @@ describe('NuiRequestError', () => {
     expect(error.message).toBe('TIMEOUT: po 30s');
   });
 });
+

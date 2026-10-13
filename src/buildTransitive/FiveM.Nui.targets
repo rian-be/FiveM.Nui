@@ -37,7 +37,7 @@
   <Target Name="GenerateNuiContracts"
           AfterTargets="Build"
           Condition="'$(GenerateNuiContracts)' == 'true'"
-          Inputs="$(TargetPath)"
+          Inputs="$(TargetPath);$(TargetPath.Replace('.dll', '.xml'))"
           Outputs="$(NuiContractsOutput)">
     <PropertyGroup>
       <NuiContractsNamespaceArg Condition="'$(NuiContractsNamespace)' != ''">--namespace &quot;$(NuiContractsNamespace)&quot;</NuiContractsNamespaceArg>

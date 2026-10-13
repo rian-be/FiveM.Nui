@@ -87,9 +87,9 @@ export type EventCommunication<E> = EventPattern<E>;
 
 /**
  * Payload type for `send` and `sendAndWait` methods.
- * - When the event has `payload`, returns that type (required for events with payload).
- * - When the event has `request` or `response`, returns `undefined` (payload not applicable).
- * - When `NuiEventMap` is empty, returns `unknown` (fallback behavior: any payload allowed).
+ * - When the event has `payload`, extracts that type (required parameter).
+ * - When `NuiEventMap` is empty, returns `unknown` (fallback behavior).
+ * - For other event types, returns `undefined` (payload not applicable, but call allowed).
  */
 export type SendPayload<E> = E extends keyof NuiEventMap
   ? NuiEventMap[E] extends { payload: infer TPayload }
@@ -99,14 +99,14 @@ export type SendPayload<E> = E extends keyof NuiEventMap
 
 /**
  * Request type for `request` method.
- * - When the event has `request`, returns that type (required when request exists in contract).
- * - When the event doesn't have `request`, returns `never` (cannot use request for this event).
- * - When `NuiEventMap` is empty, returns `unknown` (fallback behavior: any request allowed).
+ * - When the event has `request`, extracts that type (required parameter).
+ * - When the event doesn't have `request`, returns `undefined` (request not applicable, but call allowed).
+ * - When `NuiEventMap` is empty, returns `unknown` (fallback behavior).
  */
 export type RequestPayload<E> = E extends keyof NuiEventMap
   ? NuiEventMap[E] extends { request: infer TRequest }
     ? TRequest
-    : never
+    : undefined
   : unknown;
 
 /**
