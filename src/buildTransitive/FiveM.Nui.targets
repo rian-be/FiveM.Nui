@@ -1,0 +1,49 @@
+<Project>
+
+  <!--
+    Opt-in TypeScript contract generation for projects that reference FiveM.Nui.
+
+    Install the CLI once:
+
+      dotnet tool install -g FiveM.Nui.Contracts
+
+    Then enable generation in the project that declares the [NuiContract] DTOs:
+
+      <PropertyGroup>
+        <GenerateNuiContracts>true</GenerateNuiContracts>
+        <NuiContractsOutput>$(MSBuildProjectDirectory)\web\src\contracts.ts</NuiContractsOutput>
+      </PropertyGroup>
+
+    The target runs after Build and writes TSDoc-annotated declarations from the
+    compiler-generated XML documentation (enable GenerateDocumentationFile) found
+    next to the assembly.
+
+    Overridable properties:
+      NuiContractsCommand    Command that runs the CLI. Default: fivem-nui-contracts.
+                             May be a multi-word command, for example
+                             "dotnet tool run fivem-nui-contracts". Quote the whole
+                             value yourself when the executable path contains spaces.
+      NuiContractsOutput     Output .ts path. Default: $(MSBuildProjectDirectory)\contracts.ts.
+      NuiContractsNamespace  Restrict generation to a namespace (optional).
+      NuiContractsArgs       Extra CLI arguments appended verbatim (optional).
+  -->
+
+  <PropertyGroup>
+    <GenerateNuiContracts Condition="'$(GenerateNuiContracts)' == ''">false</GenerateNuiContracts>
+    <NuiContractsCommand Condition="'$(NuiContractsCommand)' == ''">fivem-nui-contracts</NuiContractsCommand>
+    <NuiContractsOutput Condition="'$(NuiContractsOutput)' == ''">$(MSBuildProjectDirectory)\contracts.ts</NuiContractsOutput>
+  </PropertyGroup>
+
+  <Target Name="GenerateNuiContracts"
+          AfterTargets="Build"
+          Condition="'$(GenerateNuiContracts)' == 'true'"
+          Inputs="$(TargetPath)"
+          Outputs="$(NuiContractsOutput)">
+    <PropertyGroup>
+      <NuiContractsNamespaceArg Condition="'$(NuiContractsNamespace)' != ''">--namespace &quot;$(NuiContractsNamespace)&quot;</NuiContractsNamespaceArg>
+    </PropertyGroup>
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(NuiContractsOutput)'))" />
+    <Exec Command="$(NuiContractsCommand) --assembly &quot;$(TargetPath)&quot; $(NuiContractsNamespaceArg) --output &quot;$(NuiContractsOutput)&quot; $(NuiContractsArgs)" />
+  </Target>
+
+</Project>
