@@ -64,6 +64,14 @@ public partial class NuiClient
         // RunContinuationsAsynchronously keeps the awaiting caller (and its
         // continuation) off the transport/inbound thread that completes the
         // response, so user code never runs inline on the callback thread.
+        // Cleanup expired requests before registering a new one to prevent
+        // memory leaks from abandoned requests that never received a response.
+        if (_options.PendingRequestTimeout != TimeSpan.Zero && 
+            _options.PendingRequestTimeout != TimeSpan.FromMilliseconds(0))
+        {
+            _requestManager.CleanupExpired(_options.PendingRequestTimeout);
+        }
+
         var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _requestManager.RegisterPendingRequest(correlationId, tcs);
 

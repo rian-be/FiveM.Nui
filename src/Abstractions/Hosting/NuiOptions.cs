@@ -46,4 +46,40 @@ public sealed class NuiOptions
     /// player-supplied data, so it is off unless explicitly enabled.
     /// </summary>
     public bool LogPayloads { get; init; } = false;
+
+    /// <summary>
+    /// Gets or sets the maximum age of pending request entries in the coordinator's
+    /// tracking dictionary. When a request entry exceeds this age, it is removed
+    /// from tracking (preventing memory leaks from orphaned entries).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is a "lazy" cleanup mechanism: expired entries are only removed when
+    /// a new request is registered. If no new requests arrive, expired entries
+    /// will remain until the client is disposed. Therefore, this option should
+    /// be significantly larger than <see cref="DefaultTimeout"/>.
+    /// </para>
+    /// 
+    /// <para>
+    /// This is NOT a replacement for <see cref="DefaultTimeout"/>. RequestAsync always
+    /// creates its own timeout via <c>CancellationTokenSource.CancelAfter()</c>. 
+    /// This option only prevents the coordinator from accumulating stale dictionary entries
+    /// when few or no requests are arriving.
+    /// </para>
+    /// 
+    /// <para>
+    /// Set to <c>TimeSpan.Zero</c> or <c>TimeSpan.FromMilliseconds(0)</c> to disable
+    /// automatic cleanup. Default is <c>5 minutes</c>.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Disable cleanup entirely - rely only on DefaultTimeout
+    /// var options = new NuiOptions { PendingRequestTimeout = TimeSpan.Zero };
+    /// 
+    /// // Aggressive cleanup - remove entries after 30 seconds of no activity
+    /// var options = new NuiOptions { PendingRequestTimeout = TimeSpan.FromSeconds(30) };
+    /// </code>
+    /// </example>
+    public TimeSpan PendingRequestTimeout { get; init; } = TimeSpan.FromMinutes(5);
 }

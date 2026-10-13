@@ -22,4 +22,10 @@ public interface INuiRequestCoordinator : IAsyncDisposable
     /// Completes a pending request with the response message.
     /// </summary>
     void CompleteRequest(string correlationId, NuiMessage message, INuiSerializer serializer);
+
+    /// <summary>
+    /// Removes all requests older than the specified timeout from tracking.
+    /// </summary>
+    /// <param name="timeout">Maximum age of requests to keep.</param>
+    int CleanupExpired(TimeSpan timeout);
 }
