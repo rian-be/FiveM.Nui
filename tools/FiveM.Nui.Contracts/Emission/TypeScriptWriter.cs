@@ -113,16 +113,27 @@ internal sealed class TypeScriptWriter(
 
             var (text, nullable) = mapper.Map(property.PropertyType, TypeIntrospection.CreateNullability(property));
 
-            builder.Append(options.Indent).Append(ContractMembers.PropertyName(property));
+            // A property is optional when the serializer may omit its key
+            // (WhenWritingNull/WhenWritingDefault), or, per the nullability rule,
+            // when it is nullable in Optional mode. An explicit Never keeps the
+            // member present, so nullability then surfaces as a null union instead.
+            var alwaysSerialized = ContractMembers.IsAlwaysSerialized(property);
+            var optional = ContractMembers.IsConditionallyOmitted(property)
+                || (!alwaysSerialized && nullable && options.Nullability == NullabilityMode.Optional);
+            var emitNull = nullable
+                && (options.Nullability == NullabilityMode.Nullable || alwaysSerialized);
 
-            if (nullable && options.Nullability == NullabilityMode.Optional)
+            // Use PropertyLiteral to handle names that aren't valid TypeScript identifiers
+            builder.Append(options.Indent).Append(ContractMembers.PropertyLiteral(ContractMembers.PropertyName(property)));
+
+            if (optional)
             {
                 builder.Append('?');
             }
 
             builder.Append(": ").Append(text);
 
-            if (nullable && options.Nullability == NullabilityMode.Nullable)
+            if (emitNull)
             {
                 builder.Append(" | null");
             }
