@@ -8,16 +8,16 @@
 [![Dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](#requirements)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
-`@fivem-nui/core` is the TypeScript half of [FiveM.Nui](../../README.md): typed request/response, C#-callable callbacks, events, and window notifications — with no framework and no runtime dependencies. Use it with Svelte, React, Vue, or plain TypeScript.
+`@fivem-nui/core` is the TypeScript half of [FiveM.Nui](../../README.md): typed request/response, C#-callable callbacks, events, and window notifications, with no framework and no runtime dependencies. Use it with Svelte, React, Vue, or plain TypeScript.
 
 ## Highlights
 
-- **Typed request/response** — correlation IDs, deadlines, and cancellation.
-- **Callbacks** — handlers C# can invoke, with clean unregistration.
-- **Events** — one-way C# → UI subscriptions, isolated per handler.
-- **Window notifications** - `open` / `close` / `focus` / `unfocus`.
-- **Error codes, not text** – branch on `NuiRequestError.code`.
-- **Diagnostics** – message counters for a dev panel.
+- **Typed request/response**: correlation IDs, deadlines, and cancellation.
+- **Callbacks**: handlers C# can invoke, with clean unregistration.
+- **Events**: one-way C# → UI subscriptions, isolated per handler.
+- **Window notifications**: `open` / `close` / `focus` / `unfocus`.
+- **Error codes, not text**: branch on `NuiRequestError.code`.
+- **Diagnostics**: message counters for a dev panel.
 - **Zero runtime dependencies**, no framework lock-in.
 
 ## Requirements
@@ -73,11 +73,46 @@ const result = await nui.request<UseItemRequest, UseItemResponse>('inventory:use
 
 `GetPlayerDataResponse`, `InventoryUpdated`, `UseItemRequest`, and `UseItemResponse` are application defined types. The C# side must expose the matching callbacks and handlers.
 
+## Generated contracts (optional)
+
+The event name strings above are unchecked: a typo compiles and fails at runtime. To make every call statically checked against the C# contract, generate a TypeScript map with the [`FiveM.Nui.Contracts`](../../tools/FiveM.Nui.Contracts) tool from C# types annotated with `[NuiContract]` and `[NuiEvent]`:
+
+```bash
+fivem-nui-contracts -a path/to/MyProject.dll -o src/contracts.ts
+```
+
+The generated file ends with a module augmentation:
+
+```ts
+declare module '@fivem-nui/core' {
+  interface NuiEventMap {
+    'inventory:use': { request: UseItemRequest; response: UseItemResponse };
+    'player:healthChanged': { payload: HealthChanged };
+  }
+}
+```
+
+Import it once for its side effect so the map is part of the program:
+
+```ts
+import './contracts';
+import { nui } from '@fivem-nui/core';
+
+// request/response are inferred from the contract.
+const response = await nui.request('inventory:use', { itemId });
+response.ok; // typed as boolean
+
+// A name that is not in the map is a compile error.
+await nui.request('inventory:usee', { itemId }); // Error: not assignable to 'never'
+```
+
+While no map is generated `NuiEventMap` stays empty and the client keeps its permissive, string-based signatures, so this is opt-in. When the map is augmented, `request`, `send`, `sendAndWait`, `callback`, `on`, and `once` check the name, the request payload, and the response type; explicit type arguments remain available as an escape hatch. Use `--core-module <module>` if the package is imported under a different specifier.
+
 ## API
 
 | Method                                           | Direction | Purpose                                                                                                               |
 |--------------------------------------------------|-----------|-----------------------------------------------------------------------------------------------------------------------|
-| `listen(target?)`                                | —         | Start receiving messages from C#. Idempotent; returns a function that stops listening.                                |
+| `listen(target?)`                                | -         | Start receiving messages from C#. Idempotent; returns a function that stops listening.                                |
 | `on<T>(event, handler)`                          | C# → UI   | Subscribe to an event. Returns `unsubscribe`.                                                                         |
 | `once<T>(event, handler)`                        | C# → UI   | Subscribe to the next matching event only. Returns `unsubscribe`.                                                     |
 | `off(event, handler?)`                           | C# → UI   | Remove one handler, or all handlers for the event.                                                                    |
@@ -89,8 +124,8 @@ const result = await nui.request<UseItemRequest, UseItemResponse>('inventory:use
 | `notify(callback, payload?)`                     | UI → C#   | POST to a named resource callback; fire and forget.                                                                   |
 | `notifyAndWait(callback, payload?)`              | UI → C#   | Same, but resolve once the resource answers.                                                                          |
 | `onWindow(handler)`                              | C# → UI   | Receive `(action, window)` for `open` / `close` / `focus` / `unfocus`.                                                |
-| `getDiagnostics()`                               | —         | Counter snapshot (`sent`, `received`, `pending`, `listeners`, …).                                                     |
-| `dispose()`                                      | —         | Drop listeners, callbacks and pending requests; reject the latter with `DISPOSED`.                                    |
+| `getDiagnostics()`                               | -         | Counter snapshot (`sent`, `received`, `pending`, `listeners`, …).                                                     |
+| `dispose()`                                      | -         | Drop listeners, callbacks and pending requests; reject the latter with `DISPOSED`.                                    |
 
 ## Errors
 
@@ -147,8 +182,8 @@ The default export `nui` is bound to the ambient resource. Create an instance wh
 
 - **`notify` never awaits its reply.** The browser reads nothing from the HTTP response, so awaiting would only stall the page for the whole POST timeout. Use `notifyAndWait` when delivery matters.
 - **`notifyAndWait` exists for the `ready` handshake.** A silent failure there leaves the panel dead for the rest of the session.
-- **`request` is for C# callbacks.** If the UI owns the handler for an event, ask C# with `request`, not `notify` — `notify` discards the reply.
-- **Dispose on teardown.** Call `dispose()` when the page unmounts (remount, HMR) so a stale client cannot keep answering C# on behalf of dead page. After `dispose()` the client is inert — create a new instance to continue.
+- **`request` is for C# callbacks.** If the UI owns the handler for an event, ask C# with `request`, not `notify`: `notify` discards the reply.
+- **Dispose on teardown.** Call `dispose()` when the page unmounts (remount, HMR) so a stale client cannot keep answering C# on behalf of dead page. After `dispose()` the client is inert; create a new instance to continue.
 - **Handlers are isolated.** A throwing event handler is logged and skipped; its siblings still receive the event. A throwing `callback` handler is answered with `CALLBACK_ERROR` rather than leaving C# waiting.
 
 ## Architecture
@@ -169,7 +204,7 @@ The default export `nui` is bound to the ambient resource. Create an instance wh
 ```bash
 npm install
 npm run build      # tsc -> dist/
-npm run check      # tsc --noEmit
+npm run check      # tsc --noEmit, plus the type-level contract tests
 npm test           # vitest run
 npm run coverage   # vitest run --coverage
 npm run watch      # rebuild on change
