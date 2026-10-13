@@ -122,6 +122,9 @@ public class ContractGeneratorTests : ContractGeneratorTestBase
 
     /// <summary>
     /// Honors <c>[JsonPropertyName]</c> and <c>[JsonIgnore]</c>.
+    /// <c>[JsonIgnore]</c> without arguments means <c>WhenWritingDefault</c>,
+    /// which is a conditional omission during serialization but the property
+    /// should still appear in the TypeScript interface.
     /// </summary>
     [Fact]
     public void Generate_HonorsJsonPropertyNameAndJsonIgnore()
@@ -129,6 +132,22 @@ public class ContractGeneratorTests : ContractGeneratorTestBase
         var ts = Gen(typeof(RenamedDto));
 
         Assert.Contains("display_name: string;", ts);
+        // Secret is included because [JsonIgnore(WhenWritingDefault)] keeps it in the interface
+        // (the serializer may emit it when non-default, but TypeScript needs the type)
+        // It's optional because Secret is string? (nullable reference)
+        Assert.Contains("secret?: string;", ts);
+    }
+
+    /// <summary>
+    /// Excludes property when <c>[JsonIgnore(Condition = Always)]</c> is used.
+    /// </summary>
+    [Fact]
+    public void Generate_ExcludesPropertiesWithJsonIgnoreAlways()
+    {
+        var ts = Gen(typeof(IgnoreAlwaysDto));
+
+        Assert.Contains("name: string;", ts);
+        // Secret is excluded because Condition is Always
         Assert.DoesNotContain("secret", ts);
     }
 

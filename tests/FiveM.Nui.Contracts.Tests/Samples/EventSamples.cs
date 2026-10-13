@@ -1,3 +1,5 @@
+using FiveM.Nui.Abstractions.Contracts;
+
 namespace FiveM.Nui.Contracts.Tests.Samples;
 
 /// <summary>
@@ -81,4 +83,17 @@ public sealed record StatChanged
     /// The current statistic value.
     /// </summary>
     public int Value { get; init; }
+}
+
+/// <summary>
+/// An event with a special character in the name (apostrophe).
+/// Used to test string literal escaping in TypeScript output.
+/// </summary>
+[NuiEvent("player:it'sReady")]
+public sealed record EventWithSpecialChar
+{
+    /// <summary>
+    /// A value for the event.
+    /// </summary>
+    public string Message { get; init; } = string.Empty;
 }

@@ -145,9 +145,28 @@ public sealed record RenamedDto
     public required string DisplayName { get; init; }
 
     /// <summary>
-    /// A value that is ignored during serialization.
+    /// A value that is conditionally ignored during serialization when writing default.
+    /// This property should still appear in the TypeScript interface.
     /// </summary>
-    [JsonIgnore]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string? Secret { get; init; }
+}
+
+/// <summary>
+/// A contract with explicit JsonIgnore.Always to always exclude a property.
+/// </summary>
+[NuiContract]
+public sealed record IgnoreAlwaysDto
+{
+    /// <summary>
+    /// The name that is always serialized.
+    /// </summary>
+    public required string Name { get; init; }
+
+    /// <summary>
+    /// A value that is always ignored.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
     public string? Secret { get; init; }
 }
 
