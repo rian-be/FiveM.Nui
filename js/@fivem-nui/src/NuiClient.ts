@@ -17,6 +17,9 @@ import type {
   NuiMessage,
   NuiResult,
   NuiWindowAction,
+  SendPayload,
+  RequestPayload,
+  RequestResponse,
 } from './types';
 
 // Re-exported so `import { NuiClientOptions } from '@fivem-nui/core'` keeps working.
@@ -98,7 +101,7 @@ export class NuiClient {
    * Fire and forget: the browser reads nothing from the HTTP reply, so there is
    * nothing to await. Use {@link NuiClient.sendAndWait} when delivery matters.
    */
-  send<E extends NuiEventKey>(eventName: E, payload?: NuiEventPayload<E>): void;
+  send<E extends NuiEventKey>(eventName: E, payload: SendPayload<E>): void;
   send<T>(eventName: keyof NuiEventMap extends never ? string : never, payload?: T): void;
   send(eventName: string, payload?: unknown): void {
     if (this.disposed) {
@@ -124,7 +127,7 @@ export class NuiClient {
    * Rejects with {@link NuiRequestError} on timeout or when the resource stops
    * answering. This is delivery confirmation only, not a C# acknowledgement.
    */
-  sendAndWait<E extends NuiEventKey>(eventName: E, payload?: NuiEventPayload<E>): Promise<void>;
+  sendAndWait<E extends NuiEventKey>(eventName: E, payload: SendPayload<E>): Promise<void>;
   sendAndWait<T>(eventName: keyof NuiEventMap extends never ? string : never, payload?: T): Promise<void>;
   async sendAndWait(eventName: string, payload?: unknown): Promise<void> {
     if (this.disposed) {
@@ -144,10 +147,10 @@ export class NuiClient {
    */
   request<E extends NuiEventKey>(
     eventName: E,
-    request?: NuiEventRequest<E>,
+    request: RequestPayload<E>,
     timeout?: number,
     signal?: AbortSignal,
-  ): Promise<NuiEventResponse<E>>;
+  ): Promise<RequestResponse<E>>;
   request<TRequest, TResponse>(
     eventName: keyof NuiEventMap extends never ? string : never,
     request?: TRequest,

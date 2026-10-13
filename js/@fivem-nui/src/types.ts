@@ -63,6 +63,64 @@ export interface NuiEventMap {}
 export type NuiEventKey = keyof NuiEventMap extends never ? string : keyof NuiEventMap;
 
 /**
+ * Discriminates event map entries by their communication pattern.
+ * - `request` - events that expect a request from the UI (have both request and response)
+ * - `response` - events that only have a response (no request from UI)
+ * - `payload` - fire-and-forget events
+ * - `event` - events that don't fit other categories (fallback)
+ */
+type EventPattern<E> = E extends keyof NuiEventMap
+  ? NuiEventMap[E] extends { request: any; response: any }
+    ? 'request'
+    : NuiEventMap[E] extends { response: any }
+    ? 'response'
+    : NuiEventMap[E] extends { payload: any }
+    ? 'payload'
+    : 'event'
+  : 'event';
+
+/**
+ * Extracts the event pattern (request/response/payload) for a mapped event.
+ * Useful for conditional typing in overload resolution.
+ */
+export type EventCommunication<E> = EventPattern<E>;
+
+/**
+ * Payload type for `send` and `sendAndWait` methods.
+ * - When the event has `payload`, returns that type (required for events with payload).
+ * - When the event has `request` or `response`, returns `undefined` (payload not applicable).
+ * - When `NuiEventMap` is empty, returns `unknown` (fallback behavior: any payload allowed).
+ */
+export type SendPayload<E> = E extends keyof NuiEventMap
+  ? NuiEventMap[E] extends { payload: infer TPayload }
+    ? TPayload
+    : undefined
+  : unknown;
+
+/**
+ * Request type for `request` method.
+ * - When the event has `request`, returns that type (required when request exists in contract).
+ * - When the event doesn't have `request`, returns `never` (cannot use request for this event).
+ * - When `NuiEventMap` is empty, returns `unknown` (fallback behavior: any request allowed).
+ */
+export type RequestPayload<E> = E extends keyof NuiEventMap
+  ? NuiEventMap[E] extends { request: infer TRequest }
+    ? TRequest
+    : never
+  : unknown;
+
+/**
+ * Response type for `request` method.
+ * - When the event has `response`, returns that type.
+ * - When `NuiEventMap` is empty, returns `unknown` (fallback behavior).
+ */
+export type RequestResponse<E> = E extends keyof NuiEventMap
+  ? NuiEventMap[E] extends { response: infer TResponse }
+    ? TResponse
+    : unknown
+  : unknown;
+
+/**
  * Request payload type for a mapped event, or `undefined` when the event takes
  * none. Resolves to `unknown` while {@link NuiEventMap} is empty.
  */
@@ -89,5 +147,5 @@ export type NuiEventResponse<E> = E extends keyof NuiEventMap
 export type NuiEventPayload<E> = E extends keyof NuiEventMap
   ? NuiEventMap[E] extends { payload: infer TPayload }
     ? TPayload
-    : unknown
+    : undefined
   : unknown;
