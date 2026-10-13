@@ -126,14 +126,24 @@ export class NuiClient {
    *
    * Rejects with a {@link NuiRequestError} whose `code` distinguishes a C#
    * failure from a timeout, so callers do not have to match on message text.
+   * Pass an {@link AbortSignal} to cancel waiting for this request alone,
+   * without disposing the client; a late response is then dropped.
    */
   async request<TRequest, TResponse>(
     eventName: string,
     request?: TRequest,
     timeout = this.requestTimeoutMs,
+    signal?: AbortSignal,
   ): Promise<TResponse> {
     if (this.disposed) {
       throw new NuiRequestError(NuiErrorCodes.Disposed, 'Client was disposed');
+    }
+
+    if (signal?.aborted) {
+      throw new NuiRequestError(
+        NuiErrorCodes.Aborted,
+        `Request for ${eventName} was aborted before it was sent`,
+      );
     }
 
     const correlationId = RequestCoordinator.generateCorrelationId();
@@ -145,6 +155,17 @@ export class NuiClient {
     };
 
     return new Promise<TResponse>((resolve, reject) => {
+      const onAbort = () => {
+        this.requestCoordinator.unregister(correlationId);
+        this.counters.rejected += 1;
+        reject(
+          new NuiRequestError(
+            NuiErrorCodes.Aborted,
+            `Request for ${eventName} was aborted`,
+          ),
+        );
+      };
+
       const timeoutId = setTimeout(() => {
         this.requestCoordinator.unregister(correlationId);
         this.counters.rejected += 1;
@@ -155,6 +176,8 @@ export class NuiClient {
           ),
         );
       }, timeout);
+
+      signal?.addEventListener('abort', onAbort, { once: true });
 
       this.requestCoordinator.register(
         correlationId,
@@ -167,6 +190,7 @@ export class NuiClient {
           reject(error);
         },
         timeoutId,
+        () => signal?.removeEventListener('abort', onAbort),
       );
 
       void this.sendMessage(message).catch((error: unknown) => {

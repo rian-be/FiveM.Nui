@@ -116,6 +116,41 @@ describe('NuiClient request/response', () => {
     await expect(pending).rejects.toMatchObject({ code: NuiErrorCodes.Timeout });
   });
 
+  it('rejects with ABORTED and drops the request when the caller aborts', async () => {
+    const { client, transport } = makeClient();
+    const controller = new AbortController();
+
+    const pending = client.request('slow:never', undefined, 5000, controller.signal);
+
+    await flush();
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ code: NuiErrorCodes.Aborted });
+
+    // The late response for the aborted request is ignored, not thrown.
+    expect(() =>
+      client.handleMessage({
+        id: transport.last().body.id!,
+        type: 'response',
+        success: true,
+        payload: {},
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects with ABORTED immediately when the signal is already aborted', async () => {
+    const { client, transport } = makeClient();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      client.request('slow:never', undefined, 5000, controller.signal),
+    ).rejects.toMatchObject({ code: NuiErrorCodes.Aborted });
+
+    // Nothing was posted: the request never left the page.
+    expect(transport.posts).toHaveLength(0);
+  });
+
   it('falls back to UNKNOWN_ERROR when the failure carries no code', async () => {
     const { client, transport } = makeClient();
 

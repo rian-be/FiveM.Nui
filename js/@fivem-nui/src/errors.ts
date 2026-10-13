@@ -14,6 +14,8 @@ export const NuiErrorCodes = {
   CallbackError: 'CALLBACK_ERROR',
   /** No response arrived before the request deadline. */
   Timeout: 'TIMEOUT',
+  /** The caller aborted the request through its `AbortSignal`. */
+  Aborted: 'ABORTED',
   /** The POST to the resource did not complete in time. */
   PostTimeout: 'POST_TIMEOUT',
   /** The resource stopped answering (restart, shutdown, unload). */

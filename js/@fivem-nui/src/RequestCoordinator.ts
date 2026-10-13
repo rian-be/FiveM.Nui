@@ -5,6 +5,8 @@ interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timeout: number;
+  /** Released whenever the request settles or is removed (e.g. abort listener). */
+  cleanup?: () => void;
 }
 
 /**
@@ -18,8 +20,14 @@ export class RequestCoordinator {
   private pending = new Map<string, PendingRequest>();
 
   /** Store a pending request so a later response can resolve or reject it. */
-  register(id: string, resolve: PendingRequest['resolve'], reject: PendingRequest['reject'], timeout: number): void {
-    this.pending.set(id, { resolve, reject, timeout });
+  register(
+    id: string,
+    resolve: PendingRequest['resolve'],
+    reject: PendingRequest['reject'],
+    timeout: number,
+    cleanup?: () => void,
+  ): void {
+    this.pending.set(id, { resolve, reject, timeout, cleanup });
   }
 
   /**
@@ -33,6 +41,7 @@ export class RequestCoordinator {
     }
 
     clearTimeout(entry.timeout);
+    entry.cleanup?.();
     this.pending.delete(id);
     entry.resolve(payload);
     return true;
@@ -49,6 +58,7 @@ export class RequestCoordinator {
     }
 
     clearTimeout(entry.timeout);
+    entry.cleanup?.();
     this.pending.delete(id);
     entry.reject(error);
     return true;
@@ -59,6 +69,7 @@ export class RequestCoordinator {
     const entry = this.pending.get(id);
     if (entry) {
       clearTimeout(entry.timeout);
+      entry.cleanup?.();
       this.pending.delete(id);
     }
   }
@@ -80,6 +91,7 @@ export class RequestCoordinator {
 
     for (const entry of entries) {
       clearTimeout(entry.timeout);
+      entry.cleanup?.();
       entry.reject(error);
     }
 

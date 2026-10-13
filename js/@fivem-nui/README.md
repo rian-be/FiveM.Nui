@@ -83,7 +83,7 @@ const result = await nui.request<UseItemRequest, UseItemResponse>('inventory:use
 | `off(event, handler?)`                           | C# → UI   | Remove one handler, or all handlers for the event.                                                                    |
 | `callback<TReq, TRes>(event, handler)`           | C# → UI   | Handle C# request the handler returns a `NuiResult`. A thrown handler is answered with `CALLBACK_ERROR`.              |
 | `unregisterCallback(event)`                      | C# → UI   | Remove handler, so C# gets `UNKNOWN_CALLBACK` again. Returns `boolean`.                                               |
-| `request<TReq, TRes>(event, payload?, timeout?)` | UI → C#   | Send request and await the response; rejects with `TIMEOUT` after `timeout` (default `30000` ms).                     |
+| `request<TReq, TRes>(event, payload?, timeout?, signal?)` | UI → C#   | Send request and await the response; rejects with `TIMEOUT` after `timeout` (default `30000` ms), or `ABORTED` when `signal` aborts. |
 | `send(event, payload?)`                          | UI → C#   | Fire and forget the HTTP reply is not read.                                                                           |
 | `sendAndWait(event, payload?)`                   | UI → C#   | Resolve once the POST lands, reject on `POST_TIMEOUT`/`TRANSPORT`. Delivery confirmation only not C# acknowledgement. |
 | `notify(callback, payload?)`                     | UI → C#   | POST to a named resource callback; fire and forget.                                                                   |
@@ -101,6 +101,7 @@ Failed operations reject with a `NuiRequestError`. Read `error.code`; `error.mes
 | `UNKNOWN_CALLBACK` | No handler is registered for the event on the side that had to answer.            |
 | `CALLBACK_ERROR`   | A callback handler threw.                                                         |
 | `TIMEOUT`          | `request()` exceeded its deadline.                                                |
+| `ABORTED`          | The caller aborted the request through its `AbortSignal`.                          |
 | `POST_TIMEOUT`     | A single POST was aborted after `postTimeoutMs`.                                  |
 | `TRANSPORT`        | The POST failed for another reason (for example, the resource stopped answering). |
 | `DISPOSED`         | `dispose()` was called while the operation was attempted or pending.              |
@@ -123,6 +124,8 @@ try {
 ```
 
 A `TIMEOUT` rejects the promise but does **not** cancel or roll back the operation: the POST may already have reached C#, and late response is dropped. If the operation has side effects, handle retries and duplicates in your application.
+
+Pass an `AbortSignal` as the fourth argument to `request()` to stop waiting for one request without disposing the client. It rejects with `ABORTED`, and a response that arrives later is dropped.
 
 ## Configuration
 
