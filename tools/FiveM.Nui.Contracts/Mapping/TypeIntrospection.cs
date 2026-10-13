@@ -10,7 +10,10 @@ namespace FiveM.Nui.Contracts.Mapping;
 /// </summary>
 internal static class TypeIntrospection
 {
-    private static readonly NullabilityInfoContext Nullability = new();
+    [ThreadStatic]
+    private static NullabilityInfoContext? _nullability;
+
+    private static NullabilityInfoContext Nullability => _nullability ??= new NullabilityInfoContext();
 
     private static readonly HashSet<Type> Numbers =
     [
