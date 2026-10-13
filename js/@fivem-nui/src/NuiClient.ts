@@ -8,7 +8,16 @@ import { consoleNuiLogger } from './logger';
 import type { NuiLogger } from './logger';
 import { NuiErrorCodes, NuiRequestError } from './errors';
 import type { NuiDiagnostics } from './diagnostics';
-import type { NuiMessage, NuiResult, NuiWindowAction } from './types';
+import type {
+  NuiEventKey,
+  NuiEventMap,
+  NuiEventPayload,
+  NuiEventRequest,
+  NuiEventResponse,
+  NuiMessage,
+  NuiResult,
+  NuiWindowAction,
+} from './types';
 
 // Re-exported so `import { NuiClientOptions } from '@fivem-nui/core'` keeps working.
 export type { NuiClientOptions } from './NuiClientOptions';
@@ -89,7 +98,9 @@ export class NuiClient {
    * Fire and forget: the browser reads nothing from the HTTP reply, so there is
    * nothing to await. Use {@link NuiClient.sendAndWait} when delivery matters.
    */
-  send<T>(eventName: string, payload?: T): void {
+  send<E extends NuiEventKey>(eventName: E, payload?: NuiEventPayload<E>): void;
+  send<T>(eventName: keyof NuiEventMap extends never ? string : never, payload?: T): void;
+  send(eventName: string, payload?: unknown): void {
     if (this.disposed) {
       this.logger.warn(`Cannot send '${eventName}' after dispose`);
       return;
@@ -113,7 +124,9 @@ export class NuiClient {
    * Rejects with {@link NuiRequestError} on timeout or when the resource stops
    * answering. This is delivery confirmation only, not a C# acknowledgement.
    */
-  async sendAndWait<T>(eventName: string, payload?: T): Promise<void> {
+  sendAndWait<E extends NuiEventKey>(eventName: E, payload?: NuiEventPayload<E>): Promise<void>;
+  sendAndWait<T>(eventName: keyof NuiEventMap extends never ? string : never, payload?: T): Promise<void>;
+  async sendAndWait(eventName: string, payload?: unknown): Promise<void> {
     if (this.disposed) {
       throw new NuiRequestError(NuiErrorCodes.Disposed, 'Client was disposed');
     }
@@ -129,12 +142,24 @@ export class NuiClient {
    * Pass an {@link AbortSignal} to cancel waiting for this request alone,
    * without disposing the client; a late response is then dropped.
    */
-  async request<TRequest, TResponse>(
-    eventName: string,
+  request<E extends NuiEventKey>(
+    eventName: E,
+    request?: NuiEventRequest<E>,
+    timeout?: number,
+    signal?: AbortSignal,
+  ): Promise<NuiEventResponse<E>>;
+  request<TRequest, TResponse>(
+    eventName: keyof NuiEventMap extends never ? string : never,
     request?: TRequest,
+    timeout?: number,
+    signal?: AbortSignal,
+  ): Promise<TResponse>;
+  async request(
+    eventName: string,
+    request?: unknown,
     timeout = this.requestTimeoutMs,
     signal?: AbortSignal,
-  ): Promise<TResponse> {
+  ): Promise<unknown> {
     if (this.disposed) {
       throw new NuiRequestError(NuiErrorCodes.Disposed, 'Client was disposed');
     }
@@ -154,7 +179,7 @@ export class NuiClient {
       payload: request,
     };
 
-    return new Promise<TResponse>((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       const onAbort = () => {
         this.requestCoordinator.unregister(correlationId);
         this.counters.rejected += 1;
@@ -183,7 +208,7 @@ export class NuiClient {
         correlationId,
         value => {
           this.counters.resolved += 1;
-          resolve(value as TResponse);
+          resolve(value);
         },
         error => {
           this.counters.rejected += 1;
@@ -257,9 +282,17 @@ export class NuiClient {
    * A handler that throws is reported back to C# as `CALLBACK_ERROR` instead of
    * leaving the request unanswered until it times out.
    */
+  callback<E extends NuiEventKey>(
+    eventName: E,
+    handler: (request: NuiEventRequest<E>) => Promise<NuiResult<NuiEventResponse<E>>>,
+  ): void;
   callback<TRequest, TResponse>(
-    eventName: string,
+    eventName: keyof NuiEventMap extends never ? string : never,
     handler: (request: TRequest) => Promise<NuiResult<TResponse>>,
+  ): void;
+  callback(
+    eventName: string,
+    handler: (request: unknown) => Promise<NuiResult<unknown>>,
   ): void {
     if (this.disposed) {
       this.logger.warn(`Cannot register callback '${eventName}' after dispose`);
@@ -270,7 +303,7 @@ export class NuiClient {
       eventName,
       async (request: unknown): Promise<NuiMessage> => {
         try {
-          const result = await handler(request as TRequest);
+          const result = await handler(request);
 
           return {
             type: 'response',
@@ -309,23 +342,27 @@ export class NuiClient {
    *
    * @returns unsubscribe function.
    */
-  on<T>(eventName: string, handler: (data: T) => void): () => void {
+  on<E extends NuiEventKey>(eventName: E, handler: (data: NuiEventPayload<E>) => void): () => void;
+  on<T>(eventName: keyof NuiEventMap extends never ? string : never, handler: (data: T) => void): () => void;
+  on(eventName: string, handler: (data: unknown) => void): () => void {
     if (this.disposed) {
       return () => {};
     }
 
-    return this.eventBus.on<T>(eventName, handler);
+    return this.eventBus.on(eventName, handler);
   }
 
   /**
    * Subscribes to the next occurrence of a C# event only.
    */
-  once<T>(eventName: string, handler: (data: T) => void): () => void {
+  once<E extends NuiEventKey>(eventName: E, handler: (data: NuiEventPayload<E>) => void): () => void;
+  once<T>(eventName: keyof NuiEventMap extends never ? string : never, handler: (data: T) => void): () => void;
+  once(eventName: string, handler: (data: unknown) => void): () => void {
     if (this.disposed) {
       return () => {};
     }
 
-    return this.eventBus.once<T>(eventName, handler);
+    return this.eventBus.once(eventName, handler);
   }
 
   /**
