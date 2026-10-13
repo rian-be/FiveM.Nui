@@ -97,3 +97,16 @@ public sealed record EventWithSpecialChar
     /// </summary>
     public string Message { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// An event whose name contains a newline, which cannot be represented as a
+/// TypeScript string literal. Used to test that generation rejects it.
+/// </summary>
+[NuiEvent("player:bad\nname")]
+public sealed record EventWithNewlineName
+{
+    /// <summary>
+    /// A value for the event.
+    /// </summary>
+    public int Value { get; init; }
+}

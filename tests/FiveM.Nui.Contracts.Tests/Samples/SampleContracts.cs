@@ -171,18 +171,6 @@ public sealed record IgnoreAlwaysDto
 }
 
 /// <summary>
-/// A contract with an explicit TypeScript name.
-/// </summary>
-[NuiContract("PlayerState")]
-public sealed record PlayerStateDto
-{
-    /// <summary>
-    /// The current health.
-    /// </summary>
-    public int Health { get; init; }
-}
-
-/// <summary>
 /// A contract with a member that maps to an opaque type.
 /// </summary>
 [NuiContract]
@@ -195,6 +183,76 @@ public sealed record OpaqueDto
 }
 
 /// <summary>
+/// A contract exercising the conditional <c>[JsonIgnore]</c> modes.
+/// The conditional members stay in the contract but may be absent on the wire,
+/// so they are emitted as optional; the <c>Never</c> member is always written
+/// and therefore stays required.
+/// </summary>
+[NuiContract]
+public sealed record ConditionalIgnoreDto
+{
+    /// <summary>
+    /// A value type omitted when it equals zero.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Quantity { get; init; }
+
+    /// <summary>
+    /// A nullable value type omitted when it equals zero or null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int? OptionalQuantity { get; init; }
+
+    /// <summary>
+    /// A nullable reference omitted when it is null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    /// <summary>
+    /// A nullable reference that is always written, even when null.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public string? Label { get; init; }
+
+    /// <summary>
+    /// A nullable reference with no ignore rule.
+    /// </summary>
+    public string? Unconditional { get; init; }
+}
+
+/// <summary>
+/// A contract with a member ignored through the no-argument <c>[JsonIgnore]</c>,
+/// which defaults to <c>Always</c> and must not appear in the interface.
+/// </summary>
+[NuiContract]
+public sealed record NoArgumentIgnoreDto
+{
+    /// <summary>
+    /// The name that is always serialized.
+    /// </summary>
+    public required string Name { get; init; }
+
+    /// <summary>
+    /// A value excluded because the no-argument attribute defaults to Always.
+    /// </summary>
+    [JsonIgnore]
+    public string InternalId { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// A contract with an explicit TypeScript name.
+/// </summary>
+[NuiContract("PlayerState")]
+public sealed record PlayerStateDto
+{
+    /// <summary>
+    /// The current health.
+    /// </summary>
+    public int Health { get; init; }
+}
+
+/// <summary>
 /// A positional record used to exercise TSDoc emission from constructor
 /// parameter documentation.
 /// </summary>
@@ -202,3 +260,81 @@ public sealed record OpaqueDto
 /// <param name="Count">The count.</param>
 [NuiContract]
 public sealed record DocSample(string Name, int Count);
+
+/// <summary>
+/// A contract with property names that require quoting in TypeScript.
+/// Used to test escaping of special characters in property names.
+/// </summary>
+[NuiContract]
+public sealed record SpecialPropertyNameDto
+{
+    /// <summary>
+    /// A property with a hyphen in the name.
+    /// </summary>
+    [JsonPropertyName("display-name")]
+    public string DisplayName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// A property with an apostrophe in the name.
+    /// </summary>
+    [JsonPropertyName("user's-id")]
+    public string UserId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// A property with a space in the name.
+    /// </summary>
+    [JsonPropertyName("first name")]
+    public string FirstName { get; init; } = string.Empty;
+
+    /// <summary>
+    /// A property with a leading digit (invalid identifier start).
+    /// </summary>
+    [JsonPropertyName("1stAttempt")]
+    public int FirstAttempt { get; init; }
+
+    /// <summary>
+    /// A valid identifier that doesn't need quoting.
+    /// </summary>
+    public string ValidName { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// An enum whose serialized member names contain characters that require
+/// escaping in the generated TypeScript string literals.
+/// </summary>
+[NuiContract]
+public enum SpecialEnum
+{
+    /// <summary>
+    /// A member whose wire name contains an apostrophe.
+    /// </summary>
+    [JsonStringEnumMemberName("it's")]
+    Apostrophe,
+
+    /// <summary>
+    /// A member whose wire name contains a backslash.
+    /// </summary>
+    [JsonStringEnumMemberName("back\\slash")]
+    Backslash,
+}
+
+/// <summary>
+/// A contract declaring a TypeScript name via <c>[NuiContract("...")]</c>.
+/// </summary>
+/// <param name="Value">The value.</param>
+[NuiContract("Bad Name")]
+public sealed record InvalidContractNameDto(string Value);
+
+/// <summary>
+/// An enum with a member name containing a newline, which cannot be represented
+/// as a TypeScript string literal. Used to test that generation rejects it.
+/// </summary>
+[NuiContract]
+public enum NewlineEnum
+{
+    /// <summary>
+    /// A member whose wire name contains a newline.
+    /// </summary>
+    [JsonStringEnumMemberName("line\nbreak")]
+    Newline,
+}

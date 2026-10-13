@@ -121,10 +121,9 @@ public class ContractGeneratorTests : ContractGeneratorTestBase
     }
 
     /// <summary>
-    /// Honors <c>[JsonPropertyName]</c> and <c>[JsonIgnore]</c>.
-    /// <c>[JsonIgnore]</c> without arguments means <c>WhenWritingDefault</c>,
-    /// which is a conditional omission during serialization but the property
-    /// should still appear in the TypeScript interface.
+    /// Honors <c>[JsonPropertyName]</c> and a conditional <c>[JsonIgnore]</c>.
+    /// <c>WhenWritingDefault</c> is a conditional omission during serialization,
+    /// so the property stays in the interface and is emitted as optional.
     /// </summary>
     [Fact]
     public void Generate_HonorsJsonPropertyNameAndJsonIgnore()
@@ -133,8 +132,7 @@ public class ContractGeneratorTests : ContractGeneratorTestBase
 
         Assert.Contains("display_name: string;", ts);
         // Secret is included because [JsonIgnore(WhenWritingDefault)] keeps it in the interface
-        // (the serializer may emit it when non-default, but TypeScript needs the type)
-        // It's optional because Secret is string? (nullable reference)
+        // (the serializer may emit it when non-default, but TypeScript needs the type).
         Assert.Contains("secret?: string;", ts);
     }
 
@@ -149,6 +147,71 @@ public class ContractGeneratorTests : ContractGeneratorTestBase
         Assert.Contains("name: string;", ts);
         // Secret is excluded because Condition is Always
         Assert.DoesNotContain("secret", ts);
+    }
+
+    /// <summary>
+    /// Excludes a member ignored with the no-argument <c>[JsonIgnore]</c>, which
+    /// defaults to <c>Always</c>.
+    /// </summary>
+    [Fact]
+    public void Generate_NoArgumentJsonIgnoreIsExcluded()
+    {
+        var ts = Gen(typeof(NoArgumentIgnoreDto));
+
+        Assert.Contains("name: string;", ts);
+        Assert.DoesNotContain("internalId", ts);
+    }
+
+    /// <summary>
+    /// Emits conditionally omitted members as optional, even when the underlying
+    /// C# type is a non-nullable value type.
+    /// </summary>
+    [Fact]
+    public void Generate_ConditionallyOmittedMembersAreOptional()
+    {
+        var ts = Gen(typeof(ConditionalIgnoreDto));
+
+        // WhenWritingDefault on a value type: present but possibly absent on the wire.
+        Assert.Contains("quantity?: number;", ts);
+        Assert.Contains("optionalQuantity?: number;", ts);
+        // WhenWritingNull on a nullable reference.
+        Assert.Contains("description?: string;", ts);
+        // No ignore rule: optional because it is a nullable reference.
+        Assert.Contains("unconditional?: string;", ts);
+    }
+
+    /// <summary>
+    /// Emits a <c>Never</c>-condition member as required with a null union, since
+    /// the serializer always writes the key, even when the value is null.
+    /// </summary>
+    [Fact]
+    public void Generate_NeverMemberStaysRequiredWithNullUnion()
+    {
+        var ts = Gen(typeof(ConditionalIgnoreDto));
+
+        Assert.Contains("label: string | null;", ts);
+        Assert.DoesNotContain("label?:", ts);
+    }
+
+    /// <summary>
+    /// In <see cref="NullabilityMode.Nullable"/>, conditionally omitted members
+    /// keep both the optional marker and the null union.
+    /// </summary>
+    [Fact]
+    public void Generate_ConditionalMembersInNullableModeKeepNullUnion()
+    {
+        var generator = new ContractGenerator(new ContractGeneratorOptions
+        {
+            Nullability = NullabilityMode.Nullable,
+        });
+
+        var ts = generator.Generate([typeof(ConditionalIgnoreDto)]);
+
+        Assert.Contains("description?: string | null;", ts);
+        Assert.Contains("optionalQuantity?: number | null;", ts);
+        // Non-nullable value type stays optional without a null union.
+        Assert.Contains("quantity?: number;", ts);
+        Assert.Contains("label: string | null;", ts);
     }
 
     /// <summary>
@@ -221,5 +284,62 @@ public class ContractGeneratorTests : ContractGeneratorTestBase
         var generator = new ContractGenerator();
 
         Assert.Throws<InvalidOperationException>(() => generator.Generate([]));
+    }
+
+    /// <summary>
+    /// Quotes property names that contain hyphens or other invalid identifier characters.
+    /// </summary>
+    [Fact]
+    public void Generate_QuotesPropertyNamesWithInvalidIdentifiers()
+    {
+        var ts = Gen(typeof(SpecialPropertyNameDto));
+
+        // Hyphenated property name should be quoted
+        Assert.Contains("'display-name': string;", ts);
+        // Apostrophe in name should be escaped and quoted
+        Assert.Contains("'user\\'s-id': string;", ts);
+        // Space in name should be quoted
+        Assert.Contains("'first name': string;", ts);
+        // Leading digit should be quoted
+        Assert.Contains("'1stAttempt': number;", ts);
+        // Valid identifier should not be quoted
+        Assert.Contains("validName: string;", ts);
+        Assert.DoesNotContain("'validName'", ts);
+    }
+
+    /// <summary>
+    /// Escapes apostrophes and backslashes in enum member string literals.
+    /// </summary>
+    [Fact]
+    public void Generate_EscapesSpecialCharactersInEnumMemberNames()
+    {
+        var ts = Gen(typeof(SpecialEnum));
+
+        Assert.Contains("| 'it\\'s'", ts);
+        Assert.Contains("| 'back\\\\slash'", ts);
+    }
+
+    /// <summary>
+    /// Rejects an enum member name that contains a newline, which has no valid
+    /// TypeScript string literal representation.
+    /// </summary>
+    [Fact]
+    public void Generate_ThrowsForNewlineInEnumMemberName()
+    {
+        var generator = new ContractGenerator();
+
+        Assert.Throws<InvalidOperationException>(() => generator.Generate([typeof(NewlineEnum)]));
+    }
+
+    /// <summary>
+    /// Rejects a <c>[NuiContract("...")]</c> override that is not a valid
+    /// TypeScript identifier, since it is inserted directly into a declaration.
+    /// </summary>
+    [Fact]
+    public void Generate_ThrowsForInvalidNuiContractName()
+    {
+        var generator = new ContractGenerator();
+
+        Assert.Throws<InvalidOperationException>(() => generator.Generate([typeof(InvalidContractNameDto)]));
     }
 }

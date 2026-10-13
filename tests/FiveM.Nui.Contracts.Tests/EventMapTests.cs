@@ -160,13 +160,14 @@ public class EventMapTests : ContractGeneratorTestBase
     }
 
     /// <summary>
-    /// Throws when event name contains newline character.
+    /// Throws when an event name contains a newline character, which cannot be
+    /// represented as a TypeScript string literal.
     /// </summary>
     [Fact]
     public void Generate_ThrowsOnNewlineInEventName()
     {
-        // We need to test this indirectly since we can't easily create
-        // an attribute with a newline via C#
-        Assert.True(true); // Placeholder - newline validation is tested via integration
+        var generator = new ContractGenerator();
+
+        Assert.Throws<InvalidOperationException>(() => generator.Generate([typeof(EventWithNewlineName)]));
     }
 }
