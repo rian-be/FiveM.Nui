@@ -3,6 +3,11 @@
     <Project Path="src/FiveM.Nui.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/FiveM.Nui.Benchmarks/FiveM.Nui.Benchmarks.csproj" />
+    <Project Path="tests/FiveM.Nui.Contracts.Tests/FiveM.Nui.Contracts.Tests.csproj" />
     <Project Path="tests/FiveM.Nui.Tests/FiveM.Nui.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/FiveM.Nui.Contracts/FiveM.Nui.Contracts.csproj" />
   </Folder>
 </Solution>
