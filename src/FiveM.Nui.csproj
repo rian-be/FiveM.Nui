@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CitizenFX.FiveM.Client" Version="0.0.4-alpha" />
+    <PackageReference Include="CitizenFX.FiveM.Client" Version="0.0.4-alpha" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
   </ItemGroup>
 

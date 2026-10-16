@@ -161,6 +161,18 @@ internal static class ContractMembers
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        return JsonSerializer.Serialize(value);
+        if (value.IndexOfAny(new[] { '\n', '\r', '\0' }) >= 0)
+        {
+            throw new InvalidOperationException(
+                $"String literal '{value}' contains control characters or newlines which are not valid in TypeScript string literals. " +
+                "Consider using a computed property name or escaping the value in the source."
+            );
+        }
+
+        var escaped = value
+            .Replace("\\", "\\\\")
+            .Replace("'", "\\'");
+
+        return $"'{escaped}'";
     }
 }

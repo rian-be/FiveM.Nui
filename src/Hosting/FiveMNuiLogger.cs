@@ -1,4 +1,4 @@
-using CitizenFX.FiveM.Client;
+using CitizenFX.FiveM.Shared;
 using FiveM.Nui.Transport;
 
 namespace FiveM.Nui.Hosting;
@@ -11,13 +11,17 @@ namespace FiveM.Nui.Hosting;
 /// <remarks>
 /// <para>
 /// The core library must stay runtime-agnostic, so this is the only place in
-/// the library that touches <c>API.Log</c> for diagnostics - the same
+/// the library that touches <c>CitizenFX.FiveM.Shared.Logger</c> for diagnostics - the same
 /// separation <see cref="FiveMNuiRuntime"/> draws for the natives.
 /// </para>
 /// <para>
 /// <see cref="LogDebug"/> is suppressed unless <see cref="IncludeDebug"/> is set,
 /// because the core logs every envelope at debug level and that floods the
 /// console during ordinary play.
+/// </para>
+/// <para>
+/// The SDK's logger only exists once a resource is running, so every write drops
+/// to the trace output when no core has been created (unit tests, tooling).
 /// </para>
 /// </remarks>
 public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
@@ -46,7 +50,7 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
             return;
         }
 
-        API.Log.Info($"{category} DEBUG: {Format(message, args)}");
+        Write(Severity.Debug, $"{category} DEBUG: {Format(message, args)}");
     }
 
     /// <summary>
@@ -61,7 +65,7 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
             return;
         }
 
-        API.Log.Info($"{category} {Format(message, args)}");
+        Write(Severity.Info, $"{category} {Format(message, args)}");
     }
 
     /// <summary>
@@ -70,7 +74,7 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
     /// <param name="message">Message template.</param>
     /// <param name="args">Arguments substituted into the template.</param>
     public void LogWarning(string message, params object[] args) =>
-        API.Log.Warn($"{category} WARN: {Format(message, args)}");
+        Write(Severity.Warn, $"{category} WARN: {Format(message, args)}");
 
     /// <summary>
     /// Writes a warning entry followed by the exception detail.
@@ -80,7 +84,7 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
     /// <param name="args">Arguments substituted into the template.</param>
     public void LogWarning(Exception exception, string message, params object[] args)
     {
-        API.Log.Warn($"{category} WARN: {Format(message, args)}");
+        Write(Severity.Warn, $"{category} WARN: {Format(message, args)}");
         LogDetail(exception);
     }
 
@@ -90,7 +94,7 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
     /// <param name="message">Message template.</param>
     /// <param name="args">Arguments substituted into the template.</param>
     public void LogError(string message, params object[] args) =>
-        API.Log.Error($"{category} ERROR: {Format(message, args)}");
+        Write(Severity.Error, $"{category} ERROR: {Format(message, args)}");
 
     /// <summary>
     /// Writes an error entry followed by the exception detail.
@@ -100,7 +104,7 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
     /// <param name="args">Arguments substituted into the template.</param>
     public void LogError(Exception exception, string message, params object[] args)
     {
-        API.Log.Error($"{category} ERROR: {Format(message, args)}");
+        Write(Severity.Error, $"{category} ERROR: {Format(message, args)}");
         LogDetail(exception);
     }
 
@@ -118,11 +122,58 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
             return;
         }
 
-        API.Log.Error($"{category} {exception.GetType().FullName}: {exception.Message}");
+        Write(Severity.Error, $"{category} {exception.GetType().FullName}: {exception.Message}");
 
         if (!string.IsNullOrWhiteSpace(exception.StackTrace))
         {
-            API.Log.Error($"{category} {exception.StackTrace}");
+            Write(Severity.Error, $"{category} {exception.StackTrace}");
+        }
+    }
+
+    /// <summary>Severity levels mirrored from the SDK's logger.</summary>
+    private enum Severity
+    {
+        Debug,
+        Info,
+        Warn,
+        Error,
+    }
+
+    /// <summary>
+    /// Writes one line through the SDK logger, or through the trace output when
+    /// the SDK has no core yet.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SharedAPI.Log"/> dereferences the core the client entrypoint
+    /// creates, so outside a running resource the getter throws. A logger that
+    /// throws takes the caller down with it, so the fallback keeps unit tests and
+    /// tooling able to produce output.
+    /// </remarks>
+    private static void Write(Severity severity, string line)
+    {
+        try
+        {
+            var log = SharedAPI.Log;
+
+            switch (severity)
+            {
+                case Severity.Debug:
+                    log.Debug(line);
+                    break;
+                case Severity.Info:
+                    log.Info(line);
+                    break;
+                case Severity.Warn:
+                    log.Warn(line);
+                    break;
+                default:
+                    log.Error(line);
+                    break;
+            }
+        }
+        catch (Exception)
+        {
+            System.Diagnostics.Debug.WriteLine(line);
         }
     }
 
