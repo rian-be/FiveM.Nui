@@ -4,8 +4,8 @@ A strongly typed bridge between C#/.NET FiveM client scripts and NUI frontends.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7.x-blue.svg)](js/@fivem-nui)
-[![Dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](js/@fivem-nui)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7.x-blue.svg)](packages/fivem-nui/core)
+[![Dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](packages/fivem-nui/core)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
 FiveM.Nui provides a typed communication layer between a FiveM C# client resource and its NUI frontend. Instead of hand-writing JSON, registering callbacks, and matching requests to responses, you work with C# records, TypeScript types, events, and callbacks.
@@ -193,6 +193,7 @@ The default `nui` instance uses the ambient FiveM resource name. Create a `NuiCl
 - [TypeScript API](docs/Api/typescript-api.md): frontend error handling and codes.
 - [Contract generation](docs/contract-generation.md): generating typed TypeScript from C# DTOs, typed events, TSDoc, and the MSBuild target.
 - [Security](docs/security.md): treating NUI input as untrusted.
+- [Testing](docs/testing.md): testing your frontend without FiveM using `@fivem-nui/core/testing`.
 - [Development](docs/development.md): running tests and benchmarks.
 - [Architecture](docs/architecture.md): internal structure and design of the C# library.
 - [TypeScript bridge package](js/@fivem-nui/README.md): installation, API reference, and frontend usage.

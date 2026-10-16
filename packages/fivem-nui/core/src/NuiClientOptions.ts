@@ -47,8 +47,10 @@ export interface NuiClientOptions {
  * (SSR, unit tests, build pipeline) so importing the package never throws.
  */
 export function readResourceName(): string {
-  if (typeof GetParentResourceName === 'function') {
-    return GetParentResourceName();
+  const runtime = globalThis as { GetParentResourceName?: () => string };
+
+  if (typeof runtime.GetParentResourceName === 'function') {
+    return runtime.GetParentResourceName();
   }
 
   return 'unknown_resource';
