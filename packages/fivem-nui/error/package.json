@@ -1,0 +1,30 @@
+{
+  "name": "@fivem-nui/error",
+  "version": "1.0.0",
+  "description": "Error handling utilities for FiveM NUI communication",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["fivem", "nui", "error", "handler", "typescript"],
+  "author": "Rainbe",
+  "license": "MIT",
+  "engines": { "node": ">=22.12.0" },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}
