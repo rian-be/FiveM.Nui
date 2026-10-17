@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "paths": {
+      "svelte": ["../../../Demo/system_resources/comps-demo/web/node_modules/svelte"],
+      "svelte/*": ["../../../Demo/system_resources/comps-demo/web/node_modules/svelte/*"],
+      "@fivem-nui/core": ["../../fivem-nui/core/dist/index.d.ts"],
+      "@fivem-nui/error": ["../../fivem-nui/error/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
