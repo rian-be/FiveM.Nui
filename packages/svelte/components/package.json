@@ -1,0 +1,45 @@
+{
+  "name": "@fivem-nui/svelte-components",
+  "version": "1.0.0",
+  "description": "UI components for FiveM NUI built on Svelte 5",
+  "type": "module",
+  "svelte": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./src": "./src/index.ts"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "svelte-package -i src -o dist",
+    "check": "tsc --noEmit --skipLibCheck --moduleResolution bundler --allowJs --esModuleInterop --strict"
+  },
+  "keywords": [
+    "fivem",
+    "nui",
+    "components",
+    "svelte"
+  ],
+  "author": "Rainbe",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "peerDependencies": {
+    "@fivem-nui/core": "^1.0.0",
+    "@fivem-nui/svelte": "^1.0.0",
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2.0.0",
+    "svelte": "^5.0.0",
+    "typescript": "^7.0.2"
+  }
+}
