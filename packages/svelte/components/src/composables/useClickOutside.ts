@@ -56,6 +56,16 @@ function mapOptions(param: ClickOutsideInput): NuiClickOutsideParameter {
   };
 }
 
+export interface ClickOutsideActionReturn {
+  update: (param: ClickOutsideInput) => void;
+  destroy: () => void;
+}
+
+export type ClickOutsideAction = (
+  node: HTMLElement,
+  param: ClickOutsideInput
+) => ClickOutsideActionReturn;
+
 /**
  * Action for detecting clicks outside an element.
  *
@@ -68,7 +78,7 @@ function mapOptions(param: ClickOutsideInput): NuiClickOutsideParameter {
  * <div use:clickOutsideAction={{ callback: close, ignore: [btnEl] }}>...</div>
  * ```
  */
-export const clickOutsideAction: Action<HTMLElement, ClickOutsideInput> = (
+export const clickOutsideAction: ClickOutsideAction = (
   node,
   param
 ) => {
@@ -88,49 +98,32 @@ export const clickOutsideAction: Action<HTMLElement, ClickOutsideInput> = (
  * Functional composable to watch click outside for an element getter or reference.
  * Automatically cleans up on component unmount via `$effect` in `@fivem-nui/svelte`.
  */
+function isOptionsGetter(fn: unknown): boolean {
+  if (typeof fn !== 'function') return false;
+  if (fn.length > 0) return false;
+  const str = Function.prototype.toString.call(fn);
+  return /(return\s*\{|\(\s*\{)[\s\S]*\b(callback|onClickOutside|enabled|ignore|capture)\b/.test(str);
+}
+
 export function useClickOutside(
   getElement: () => HTMLElement | null | undefined,
   callbackOrOptions: ClickOutsideInput | (() => ClickOutsideInput)
 ): void {
-  let isOptionGetter: boolean | null = null;
-
   const getOptions = (): NuiClickOutsideParameter => {
     if (typeof callbackOrOptions !== 'function') {
       return mapOptions(callbackOrOptions);
     }
 
-    if (callbackOrOptions.length > 0) {
-      // Callback accepting an event: `(event) => ...`
-      return mapOptions(callbackOrOptions as (event: MouseEvent | TouchEvent | PointerEvent) => void);
-    }
-
-    if (isOptionGetter === false) {
-      return mapOptions(callbackOrOptions as () => void);
-    }
-
-    if (isOptionGetter === true) {
+    if (isOptionsGetter(callbackOrOptions)) {
       const result = (callbackOrOptions as () => ClickOutsideInput)();
       return mapOptions(result);
     }
 
-    // First evaluation: check if it returns an options object
-    try {
-      const result = (callbackOrOptions as () => unknown)();
-      if (
-        result &&
-        typeof result === 'object' &&
-        ('callback' in result || 'onClickOutside' in result || 'enabled' in result || 'ignore' in result || 'capture' in result)
-      ) {
-        isOptionGetter = true;
-        return mapOptions(result as ClickOutsideOptions | NuiClickOutsideParameter);
-      } else {
-        isOptionGetter = false;
-        return mapOptions(callbackOrOptions as () => void);
-      }
-    } catch {
-      isOptionGetter = false;
-      return mapOptions(callbackOrOptions as () => void);
-    }
+    return {
+      callback: callbackOrOptions as (event: PointerEvent) => void,
+      onClickOutside: callbackOrOptions as (event: PointerEvent) => void,
+      capture: true
+    };
   };
 
   bridgeUseClickOutside(getElement, getOptions);

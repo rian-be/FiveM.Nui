@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "paths": {
+      "vitest": ["../../bridge/node_modules/vitest/dist/index.d.ts"],
+      "@fivem-nui/svelte": ["../../bridge/dist/index.d.ts", "../../bridge/src/index.ts"],
+      "@fivem-nui/core": ["../../../fivem-nui/core/dist/index.d.ts", "../../../fivem-nui/core/src/index.ts"],
+      "svelte": ["../../../../Demo/system_resources/comps-demo/web/node_modules/svelte"],
+      "svelte/*": ["../../../../Demo/system_resources/comps-demo/web/node_modules/svelte/*"]
+    }
+  },
+  "include": ["**/*", "../src/**/*"]
+}

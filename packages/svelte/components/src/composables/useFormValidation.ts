@@ -87,6 +87,9 @@ export function validateField(
   return null;
 }
 
+/**
+ * Validates form values against the provided rules and returns a map of field errors.
+ */
 export function validateForm(
   values: Record<string, unknown>,
   rules: Record<string, ValidationRules>,
