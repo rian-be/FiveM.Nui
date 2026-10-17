@@ -105,7 +105,15 @@
 
     if (eventName) {
       try {
-        client?.send(eventName, { ...payload, count: payload.openIds.length });
+        const res: unknown = client?.send(eventName, { ...payload, count: payload.openIds.length });
+        if (res && typeof (res as { catch?: unknown }).catch === "function") {
+          (res as Promise<unknown>).catch((err: unknown) => {
+            console.warn(
+              "[fivem-nui-components] NuiAccordion: failed to send event",
+              err,
+            );
+          });
+        }
       } catch (err) {
         console.warn(
           "[fivem-nui-components] NuiAccordion: failed to send event",
