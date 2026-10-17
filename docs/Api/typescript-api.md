@@ -1,6 +1,6 @@
 # TypeScript API
 
-`@fivem-nui/core` is the frontend bridge. Its installation steps and full API reference are in the [package README](../../js/@fivem-nui/README.md). This page covers errors.
+`@fivem-nui/core` is the frontend bridge. Its installation steps and full API reference are in the [package README](../../packages/fivem-nui/core/README.md). This page covers errors.
 
 ## Error handling
 

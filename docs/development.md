@@ -9,7 +9,7 @@ Everything builds with the .NET 10 SDK and Node.js see [Requirements](../README.
 | `src/` | `FiveM.Nui`, the C# library. |
 | `tools/FiveM.Nui.Contracts/` | The contract generator CLI. |
 | `tests/` | C# unit tests and BenchmarkDotNet benchmarks. |
-| `js/@fivem-nui/` | The `@fivem-nui/core` TypeScript package. |
+| `packages/fivem-nui/core/` | The `@fivem-nui/core` TypeScript package. |
 | `docs/` | This documentation. |
 
 ## Build
@@ -25,7 +25,7 @@ This compiles the library, the contract generator, the tests, and the benchmarks
 The TypeScript package:
 
 ```bash
-cd js/@fivem-nui
+cd packages/fivem-nui/core
 npm install
 npm run build
 ```
@@ -56,7 +56,7 @@ dotnet test tests/FiveM.Nui.Tests --collect:"XPlat Code Coverage"
 TypeScript tests use vitest:
 
 ```bash
-cd js/@fivem-nui
+cd packages/fivem-nui/core
 npm test           # vitest run
 npm run test:watch
 npm run coverage   # vitest run --coverage

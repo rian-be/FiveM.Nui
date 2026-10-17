@@ -17,4 +17,17 @@ export type {
   NuiEventRequest,
   NuiEventResponse,
   NuiEventPayload,
+  SendPayload,
+  RequestPayload,
+  RequestResponse,
 } from './types';
+
+export { createTestNuiClient, fakeFetch } from './testing';
+export type {
+  CapturedPost,
+  CallbackHandler,
+  CallbackMap,
+  FakeFetch,
+  SentMessage,
+  TestNuiClient,
+} from './testing';

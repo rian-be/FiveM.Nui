@@ -4,7 +4,7 @@
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
-  timeout: number;
+  timeout: ReturnType<typeof setTimeout>,
   /** Released whenever the request settles or is removed (e.g. abort listener). */
   cleanup?: () => void;
 }
@@ -24,7 +24,7 @@ export class RequestCoordinator {
     id: string,
     resolve: PendingRequest['resolve'],
     reject: PendingRequest['reject'],
-    timeout: number,
+    timeout: ReturnType<typeof setTimeout>,
     cleanup?: () => void,
   ): void {
     this.pending.set(id, { resolve, reject, timeout, cleanup });

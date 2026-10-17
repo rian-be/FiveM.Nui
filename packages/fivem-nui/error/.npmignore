@@ -1,0 +1,24 @@
+# Source files
+src/
+
+# TypeScript config
+tsconfig.json
+
+# Tests
+tests/
+test/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore

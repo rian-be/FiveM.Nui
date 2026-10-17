@@ -194,7 +194,7 @@ export class NuiClient {
         );
       };
 
-      const timeoutId = setTimeout(() => {
+      const timeoutId = globalThis.setTimeout(() => {
         this.requestCoordinator.unregister(correlationId);
         this.counters.rejected += 1;
         reject(
