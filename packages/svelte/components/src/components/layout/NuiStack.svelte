@@ -25,6 +25,20 @@
     children?: Snippet;
   }
 
+  const VALID_DIRECTIONS = new Set<Direction>([
+    "row",
+    "column",
+    "row-reverse",
+    "column-reverse",
+  ]);
+  const VALID_ALIGNS = new Set<Align>([
+    "start",
+    "center",
+    "end",
+    "stretch",
+    "baseline",
+  ]);
+
   let {
     direction = "column",
     distribute = false,
@@ -38,8 +52,23 @@
     ...rest
   }: Props = $props();
 
-  const toCss = (v: string | number) => (typeof v === "number" ? `${v}px` : v);
-  const styleVars = $derived(`--nui-stack-gap:${toCss(gap)};`);
+  const toCss = (v: string | number | undefined | null, fallback: string) => {
+    if (typeof v === "number") return `${v}px`;
+    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+    return fallback;
+  };
+
+  const safeDirection = $derived(
+    direction && VALID_DIRECTIONS.has(direction) ? direction : "column",
+  );
+  const safeAlign = $derived(
+    align && VALID_ALIGNS.has(align) ? align : "stretch",
+  );
+
+  const styleVars = $derived(`--nui-stack-gap:${toCss(gap, "0.5rem")};`);
+  /**
+   * Concatenate extra inline style. Svelte 5 passes style strings here; non-string values are safely ignored.
+   */
   const styleExtra = $derived(typeof style === "string" ? style : "");
 </script>
 
@@ -47,8 +76,8 @@
   {...rest}
   class={[
     "nui-stack",
-    `nui-stack--${direction}`,
-    `nui-stack--align-${align}`,
+    `nui-stack--${safeDirection}`,
+    `nui-stack--align-${safeAlign}`,
     distribute && "nui-stack--distribute",
     wrap && "nui-stack--wrap",
     inline && "nui-stack--inline",

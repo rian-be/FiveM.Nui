@@ -4,8 +4,12 @@
 
   interface Props extends HTMLAttributes<HTMLDivElement> {
     /** Max number of columns (responsive) or exact count (fixed) */
-    columns?: number;
-    /** Gap between cards. Numbers are treated as px */
+    columns?: number | `${number}` | (string & {});
+    /**
+     * Gap between cards. Numbers are treated as px (e.g. 16 -> '16px').
+     * Fixed units (rem, px) are recommended; percentage units in responsive mode may produce
+     * variable track minimums because container-relative calc() evaluation depends on outer context.
+     */
     gap?: string | number;
     /** Auto fit columns by `minCardWidth`, capped by `columns` */
     responsive?: boolean;
@@ -28,12 +32,25 @@
     ...rest
   }: Props = $props();
 
-  const toCss = (v: string | number) => (typeof v === "number" ? `${v}px` : v);
-  const cols = $derived(Math.max(1, Math.floor(columns) || 1));
+  const toCss = (v: string | number | undefined | null, fallback: string) => {
+    if (typeof v === "number") return `${v}px`;
+    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+    return fallback;
+  };
+
+  const cols = $derived.by(() => {
+    if (columns == null) return 3;
+    const num = Number(columns);
+    if (!Number.isFinite(num)) return 1;
+    return Math.max(1, Math.floor(num));
+  });
 
   const styleVars = $derived(
-    `--nui-card-columns:${cols};--nui-card-gap:${toCss(gap)};--nui-card-min-width:${toCss(minCardWidth)};`,
+    `--nui-card-columns:${cols};--nui-card-gap:${toCss(gap, "1rem")};--nui-card-min-width:${toCss(minCardWidth, "250px")};`,
   );
+  /**
+   * Concatenate extra inline style. Svelte 5 passes style strings here; non-string values are safely ignored.
+   */
   const styleExtra = $derived(typeof style === "string" ? style : "");
 </script>
 

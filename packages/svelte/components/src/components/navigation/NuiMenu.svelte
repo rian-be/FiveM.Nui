@@ -13,7 +13,6 @@
 </script>
 
 <script lang="ts">
-  import { tick } from "svelte";
   import type { Snippet } from "svelte";
   import type { HTMLAttributes } from "svelte/elements";
 
@@ -49,6 +48,7 @@
   let triggerEl: HTMLButtonElement | null = $state(null);
   let dropdownEl: HTMLElement | null = $state(null);
   let openSub: string | null = $state(null);
+  let focusTargetOnOpen: "first" | "last" = "first";
 
   function close(returnFocus = false) {
     open = false;
@@ -61,16 +61,12 @@
     else open = true;
   }
 
-  // Focus the first item after opening, reset submenu state after closing
-  $effect(() => {
-    if (open) {
-      tick().then(() => {
-        if (open) itemsOf(dropdownEl)[0]?.focus();
-      });
-    } else {
-      openSub = null;
+  function escapeCss(str: string): string {
+    if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+      return CSS.escape(str);
     }
-  });
+    return str.replace(/["\\]/g, "\\$&");
+  }
 
   function itemsOf(menu: HTMLElement | null): HTMLElement[] {
     if (!menu) return [];
@@ -78,6 +74,77 @@
       (el) => el.closest('[role="menu"]') === menu,
     );
   }
+
+  function getEnabledItems(menu: HTMLElement | null): HTMLElement[] {
+    return itemsOf(menu).filter(
+      (el) => el.getAttribute("aria-disabled") !== "true",
+    );
+  }
+
+  function getNextEnabledItem(
+    menu: HTMLElement,
+    current: HTMLElement,
+    direction: 1 | -1,
+  ): HTMLElement | null {
+    const all = itemsOf(menu);
+    const len = all.length;
+    if (len === 0) return null;
+    let idx = all.indexOf(current);
+    if (idx === -1) idx = direction > 0 ? -1 : 0;
+
+    for (let step = 1; step <= len; step++) {
+      const nextIdx = (idx + direction * step + len * 1000) % len;
+      const candidate = all[nextIdx];
+      if (candidate.getAttribute("aria-disabled") !== "true") {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  let focusSubmenuOnOpen = false;
+  let hasFocusedInitial = false;
+  let typeaheadBuffer = "";
+  let typeaheadTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Focus the item after opening, reset submenu state after closing.
+  // Guarded by open && dropdownEl to ensure DOM node is bound before focusing.
+  // hasFocusedInitial prevents re-renders while menu is open from stealing focus.
+  $effect(() => {
+    if (open && dropdownEl) {
+      if (!hasFocusedInitial) {
+        hasFocusedInitial = true;
+        const enabled = getEnabledItems(dropdownEl);
+        const all = itemsOf(dropdownEl);
+        const target =
+          focusTargetOnOpen === "last"
+            ? (enabled[enabled.length - 1] ?? all[all.length - 1])
+            : (enabled[0] ?? all[0]);
+        target?.focus();
+        focusTargetOnOpen = "first";
+      }
+    } else if (!open) {
+      hasFocusedInitial = false;
+      openSub = null;
+      focusTargetOnOpen = "first";
+      focusSubmenuOnOpen = false;
+    }
+  });
+
+  // Focus the first item of submenu when opened via keyboard
+  $effect(() => {
+    if (openSub && focusSubmenuOnOpen && dropdownEl) {
+      const panel = dropdownEl.querySelector<HTMLElement>(
+        `[data-submenu-panel="${escapeCss(openSub)}"]`,
+      );
+      if (panel) {
+        const enabled = getEnabledItems(panel);
+        const first = enabled[0] ?? itemsOf(panel)[0];
+        first?.focus();
+        focusSubmenuOnOpen = false;
+      }
+    }
+  });
 
   function activate(item: MenuItem) {
     if (item.disabled) return;
@@ -88,14 +155,9 @@
     }
   }
 
-  async function openSubmenu(id: string, focusFirst: boolean) {
+  function openSubmenu(id: string, focusFirst: boolean) {
+    focusSubmenuOnOpen = focusFirst;
     openSub = id;
-    if (!focusFirst) return;
-    await tick();
-    const panel = dropdownEl?.querySelector<HTMLElement>(
-      `[data-submenu-panel="${CSS.escape(id)}"]`,
-    );
-    itemsOf(panel ?? null)[0]?.focus();
   }
 
   function closeSubmenuFromPanel(panel: HTMLElement) {
@@ -103,7 +165,7 @@
     openSub = null;
     if (id) {
       dropdownEl
-        ?.querySelector<HTMLElement>(`[data-submenu="${CSS.escape(id)}"]`)
+        ?.querySelector<HTMLElement>(`[data-submenu="${escapeCss(id)}"]`)
         ?.focus();
     }
   }
@@ -124,12 +186,24 @@
   }
 
   function hoverLeave(event: PointerEvent) {
-    if (event.pointerType === "mouse") openSub = null;
+    if (event.pointerType === "mouse") {
+      // Do not dismiss submenu on mouse leave if keyboard focus is currently inside the submenu panel
+      if (openSub && dropdownEl && typeof document !== "undefined") {
+        const panel = dropdownEl.querySelector<HTMLElement>(
+          `[data-submenu-panel="${escapeCss(openSub)}"]`,
+        );
+        if (panel && document.activeElement && panel.contains(document.activeElement)) {
+          return;
+        }
+      }
+      openSub = null;
+    }
   }
 
   function onTriggerKeydown(event: KeyboardEvent) {
     if (!open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
       event.preventDefault();
+      focusTargetOnOpen = event.key === "ArrowUp" ? "last" : "first";
       open = true;
     }
   }
@@ -139,53 +213,111 @@
     const menu = target.closest<HTMLElement>('[role="menu"]');
     if (!menu) return;
 
-    const list = itemsOf(menu);
-    const index = list.indexOf(target);
-    if (index === -1) return;
-
     const inSubmenu = menu !== dropdownEl;
+    const openSubKey = align === "end" ? "ArrowLeft" : "ArrowRight";
+    const closeSubKey = align === "end" ? "ArrowRight" : "ArrowLeft";
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (inSubmenu) closeSubmenuFromPanel(menu);
+      else close(true);
+      return;
+    }
+
+    if (inSubmenu && event.key === closeSubKey) {
+      event.preventDefault();
+      closeSubmenuFromPanel(menu);
+      return;
+    }
+
+    const list = itemsOf(menu);
+    if (!list.includes(target)) return;
 
     switch (event.key) {
-      case "ArrowDown":
+      case "ArrowDown": {
         event.preventDefault();
-        list[(index + 1) % list.length]?.focus();
+        const next = getNextEnabledItem(menu, target, 1);
+        next?.focus();
         break;
-      case "ArrowUp":
+      }
+      case "ArrowUp": {
         event.preventDefault();
-        list[(index - 1 + list.length) % list.length]?.focus();
+        const prev = getNextEnabledItem(menu, target, -1);
+        prev?.focus();
         break;
-      case "Home":
+      }
+      case "Home": {
         event.preventDefault();
-        list[0]?.focus();
+        const first = getEnabledItems(menu)[0] ?? itemsOf(menu)[0];
+        first?.focus();
         break;
-      case "End":
+      }
+      case "End": {
         event.preventDefault();
-        list[list.length - 1]?.focus();
+        const enabled = getEnabledItems(menu);
+        const last =
+          enabled[enabled.length - 1] ??
+          itemsOf(menu)[itemsOf(menu).length - 1];
+        last?.focus();
         break;
-      case "ArrowRight": {
-        const id = target.dataset.submenu;
-        if (id && target.getAttribute("aria-disabled") !== "true") {
-          event.preventDefault();
-          openSubmenu(id, true);
+      }
+      case "ArrowRight":
+      case "ArrowLeft": {
+        if (event.key === openSubKey) {
+          const id = target.dataset.submenu;
+          if (id && target.getAttribute("aria-disabled") !== "true") {
+            event.preventDefault();
+            openSubmenu(id, true);
+          }
         }
         break;
       }
-      case "ArrowLeft":
-        if (inSubmenu) {
-          event.preventDefault();
-          closeSubmenuFromPanel(menu);
-        }
-        break;
-      case "Escape":
-        event.preventDefault();
-        event.stopPropagation();
-        if (inSubmenu) closeSubmenuFromPanel(menu);
-        else close(true);
-        break;
       case "Tab":
         // Let the browser move focus on, starting from the trigger
         close(true);
         break;
+      default: {
+        if (
+          event.key.length === 1 &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey
+        ) {
+          event.preventDefault();
+          if (typeaheadTimeout) clearTimeout(typeaheadTimeout);
+          typeaheadBuffer += event.key.toLowerCase();
+          typeaheadTimeout = setTimeout(() => {
+            typeaheadBuffer = "";
+          }, 500);
+
+          const enabled = getEnabledItems(menu);
+          if (enabled.length === 0) break;
+          const currIdx = enabled.indexOf(target);
+
+          // Support multi-character matching (e.g. "du" for duplicate)
+          // or single-character cycling when the same key is pressed consecutively
+          const isSingleKeyCycle =
+            typeaheadBuffer.length > 1 &&
+            typeaheadBuffer.split("").every((c) => c === typeaheadBuffer[0]);
+          const query = isSingleKeyCycle ? typeaheadBuffer[0] : typeaheadBuffer;
+          const searchStart = isSingleKeyCycle ? 1 : 0;
+
+          for (let step = searchStart; step < enabled.length + searchStart; step++) {
+            const idx = (currIdx + step) % enabled.length;
+            const item = enabled[idx];
+            // Match against data-label attribute to avoid icons interfering with query matching
+            const text = (item.getAttribute("data-label") ?? item.textContent ?? "")
+              .trim()
+              .toLowerCase();
+            if (text.startsWith(query)) {
+              item.focus();
+              break;
+            }
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -200,9 +332,13 @@
     }
   }
 
+  /**
+   * Closes the menu when focus moves outside the component container.
+   * Note: relatedTarget is null for clicks on non-focusable areas, which are handled
+   * by the window pointerdown listener.
+   */
   function onFocusOut(event: FocusEvent) {
     const next = event.relatedTarget as Node | null;
-    // relatedTarget is null for clicks on non-focusable areas, so only react to real focus moves
     if (open && next && containerEl && !containerEl.contains(next)) close();
   }
 </script>
@@ -218,6 +354,8 @@
       role="menuitem"
       tabindex="-1"
       class="nui-menu__item"
+      data-id={item.id}
+      data-label={item.label}
       aria-disabled={item.disabled || undefined}
       onclick={() => activate(item)}
     >
@@ -278,6 +416,8 @@
               tabindex="-1"
               class="nui-menu__item"
               class:nui-menu__item--open={openSub === item.id}
+              data-id={item.id}
+              data-label={item.label}
               data-submenu={item.id}
               aria-haspopup="menu"
               aria-expanded={openSub === item.id}

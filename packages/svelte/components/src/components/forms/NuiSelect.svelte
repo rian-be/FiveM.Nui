@@ -10,8 +10,8 @@
 </script>
 
 <script lang="ts">
-  import { nui } from '@fivem-nui/svelte';
-  import type { SvelteNuiClient } from '@fivem-nui/svelte';
+  import { nui } from "@fivem-nui/svelte";
+  import type { SvelteNuiClient } from "@fivem-nui/svelte";
 
   interface Props {
     /** NUI event name emitted when selection changes or is cleared. */
@@ -59,21 +59,21 @@
   const valueId = `${selectId}-val`;
 
   let {
-    eventName = '',
+    eventName = "",
     client = nui,
-    value = $bindable(''),
-    label = '',
-    placeholder = 'Select...',
+    value = $bindable(""),
+    label = "",
+    placeholder = "Select...",
     options = [],
     disabled = false,
     multiple = false,
     searchable = true,
-    maxHeight = '200px',
-    name = ''
+    maxHeight = "200px",
+    name = "",
   }: Props = $props();
 
   let open = $state(false);
-  let query = $state('');
+  let query = $state("");
   let focusedIndex = $state(-1);
   let containerEl: HTMLElement | null = $state(null);
   let triggerButtonEl: HTMLButtonElement | null = $state(null);
@@ -92,10 +92,10 @@
     try {
       const parsed: unknown = JSON.parse(value);
       return Array.isArray(parsed)
-        ? parsed.filter((item): item is string => typeof item === 'string')
-        : [value];
+        ? parsed.filter((item): item is string => typeof item === "string")
+        : [];
     } catch {
-      return [value];
+      return [];
     }
   });
 
@@ -103,7 +103,7 @@
 
   const triggerLabel = $derived.by(() => {
     if (multiple) {
-      return selected.length ? selected.map(labelOf).join(', ') : placeholder;
+      return selected.length ? selected.map(labelOf).join(", ") : placeholder;
     }
     return value ? labelOf(value) : placeholder;
   });
@@ -111,23 +111,29 @@
   const visible = $derived.by(() => {
     const term = query.trim().toLowerCase();
     return term
-      ? options.filter((o) => o.label.toLowerCase().includes(term) && !o.disabled)
+      ? options.filter(
+          (o) => o.label.toLowerCase().includes(term) && !o.disabled,
+        )
       : options;
   });
 
-  const canClear = $derived(!disabled && (multiple ? selected.length > 0 : value !== ''));
+  const canClear = $derived(
+    !disabled && (multiple ? selected.length > 0 : value !== ""),
+  );
 
   /**
    * Computes the ID of the currently focused option for `aria-activedescendant`.
    * Only returns an ID when focusedIndex points to an existing, non-disabled option.
    */
   const activeDescendantId = $derived(
-    open && focusedIndex >= 0 && visible[focusedIndex] && !visible[focusedIndex].disabled
+    open &&
+      focusedIndex >= 0 &&
+      visible[focusedIndex] &&
+      !visible[focusedIndex].disabled
       ? `${listboxId}-opt-${focusedIndex}`
-      : undefined
+      : undefined,
   );
 
-  // Warn about duplicate option values to prevent key conflicts in {#each} and ambiguous selection
   $effect(() => {
     const seen = new Set<string>();
     for (const opt of options) {
@@ -145,7 +151,7 @@
   $effect(() => {
     if (disabled && open) {
       open = false;
-      query = '';
+      query = "";
       focusedIndex = -1;
       lastFocusedValue = undefined;
     }
@@ -168,7 +174,9 @@
     if (previousOptions !== undefined && currentOptions !== previousOptions) {
       if (open) {
         if (lastFocusedValue !== undefined) {
-          const newIdx = visible.findIndex((o) => o.value === lastFocusedValue && !o.disabled);
+          const newIdx = visible.findIndex(
+            (o) => o.value === lastFocusedValue && !o.disabled,
+          );
           if (newIdx >= 0) {
             focusedIndex = newIdx;
             lastFocusedValue = visible[newIdx]?.value;
@@ -186,8 +194,11 @@
   $effect(() => {
     if (open && focusedIndex >= 0 && listboxEl) {
       const optEl = listboxEl.querySelector(`[data-index="${focusedIndex}"]`);
-      if (optEl && typeof (optEl as HTMLElement).scrollIntoView === 'function') {
-        (optEl as HTMLElement).scrollIntoView({ block: 'nearest' });
+      if (
+        optEl &&
+        typeof (optEl as HTMLElement).scrollIntoView === "function"
+      ) {
+        (optEl as HTMLElement).scrollIntoView({ block: "nearest" });
       }
     }
   });
@@ -278,7 +289,9 @@
 
     // Pre-focus the currently selected option if visible and enabled
     if (!multiple && value) {
-      const selectedIdx = visible.findIndex((o) => o.value === value && !o.disabled);
+      const selectedIdx = visible.findIndex(
+        (o) => o.value === value && !o.disabled,
+      );
       if (selectedIdx >= 0) {
         focusedIndex = selectedIdx;
         lastFocusedValue = visible[selectedIdx]?.value;
@@ -292,7 +305,7 @@
 
   function closeDropdown(restoreFocus = true) {
     open = false;
-    query = '';
+    query = "";
     focusedIndex = -1;
     lastFocusedValue = undefined;
     if (restoreFocus && triggerButtonEl) {
@@ -320,7 +333,7 @@
       safeSend(eventName, {
         value: next,
         option: { value: option.value, label: option.label },
-        multiple: true
+        multiple: true,
       });
     } else {
       value = option.value;
@@ -328,7 +341,7 @@
       safeSend(eventName, {
         value: option.value,
         label: option.label,
-        multiple: false
+        multiple: false,
       });
     }
   }
@@ -338,16 +351,29 @@
     if (disabled) return;
 
     if (multiple) {
-      value = '[]';
+      value = "[]";
       safeSend(eventName, { value: [], multiple: true });
     } else {
-      value = '';
-      safeSend(eventName, { value: '', label: '', multiple: false });
+      value = "";
+      safeSend(eventName, { value: "", label: "", multiple: false });
     }
 
     if (triggerButtonEl) {
       triggerButtonEl.focus();
     }
+  }
+
+  function searchAction(node: HTMLInputElement) {
+    const onInput = () => {
+      query = node.value;
+      focusFirst();
+    };
+    node.addEventListener("input", onInput);
+    return {
+      destroy() {
+        node.removeEventListener("input", onInput);
+      },
+    };
   }
 
   function handleSearchInput(event: Event) {
@@ -358,34 +384,34 @@
   function onTriggerKeydown(event: KeyboardEvent) {
     if (disabled) return;
 
-    if (event.key === 'ArrowDown') {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       if (!open) {
         openDropdown();
       } else {
         moveFocus(1);
       }
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === "ArrowUp") {
       event.preventDefault();
       if (!open) {
         openDropdown();
       } else {
         moveFocus(-1);
       }
-    } else if (event.key === 'Enter' || event.key === ' ') {
+    } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       if (!open) {
         openDropdown();
       } else {
         selectFocusedOption();
       }
-    } else if (event.key === 'Escape') {
+    } else if (event.key === "Escape") {
       if (open) {
         event.preventDefault();
         event.stopImmediatePropagation();
         closeDropdown(true);
       }
-    } else if (event.key === 'Tab') {
+    } else if (event.key === "Tab") {
       if (open) {
         closeDropdown(false);
       }
@@ -393,51 +419,51 @@
   }
 
   function onSearchKeydown(event: KeyboardEvent) {
-    if (event.key === 'ArrowDown') {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       moveFocus(1);
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === "ArrowUp") {
       event.preventDefault();
       moveFocus(-1);
-    } else if (event.key === 'Home') {
+    } else if (event.key === "Home") {
       event.preventDefault();
       focusFirst();
-    } else if (event.key === 'End') {
+    } else if (event.key === "End") {
       event.preventDefault();
       focusLast();
-    } else if (event.key === 'Enter') {
+    } else if (event.key === "Enter") {
       event.preventDefault();
       selectFocusedOption();
-    } else if (event.key === 'Escape') {
+    } else if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
       closeDropdown(true);
-    } else if (event.key === 'Tab') {
+    } else if (event.key === "Tab") {
       closeDropdown(false);
     }
   }
 
   function onListboxKeydown(event: KeyboardEvent) {
-    if (event.key === 'ArrowDown') {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       moveFocus(1);
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === "ArrowUp") {
       event.preventDefault();
       moveFocus(-1);
-    } else if (event.key === 'Home') {
+    } else if (event.key === "Home") {
       event.preventDefault();
       focusFirst();
-    } else if (event.key === 'End') {
+    } else if (event.key === "End") {
       event.preventDefault();
       focusLast();
-    } else if (event.key === 'Enter' || event.key === ' ') {
+    } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       selectFocusedOption();
-    } else if (event.key === 'Escape') {
+    } else if (event.key === "Escape") {
       event.preventDefault();
       event.stopImmediatePropagation();
       closeDropdown(true);
-    } else if (event.key === 'Tab') {
+    } else if (event.key === "Tab") {
       closeDropdown(false);
     }
   }
@@ -468,8 +494,8 @@
       id={triggerId}
       class="nui-select__trigger"
       bind:this={triggerButtonEl}
-      disabled={disabled}
-      role={!searchable ? 'combobox' : undefined}
+      {disabled}
+      role={!searchable ? "combobox" : undefined}
       aria-expanded={open}
       aria-haspopup="listbox"
       aria-controls={listboxId}
@@ -484,7 +510,9 @@
       >
         {triggerLabel}
       </span>
-      <span class="nui-select__arrow" aria-hidden="true">{open ? '▴' : '▾'}</span>
+      <span class="nui-select__arrow" aria-hidden="true"
+        >{open ? "▴" : "▾"}</span
+      >
     </button>
 
     {#if canClear}
@@ -492,8 +520,8 @@
         type="button"
         class="nui-select__clear"
         aria-label="Clear selection"
-        onclick={clear}
-      >×</button>
+        onclick={clear}>×</button
+      >
     {/if}
   </div>
 
@@ -502,6 +530,7 @@
       {#if searchable}
         <input
           bind:this={searchInputEl}
+          use:searchAction
           class="nui-select__search"
           type="text"
           role="combobox"
@@ -511,7 +540,7 @@
           aria-activedescendant={activeDescendantId}
           placeholder="Search..."
           value={query}
-          aria-label={label ? `Search ${label}` : 'Search options'}
+          aria-label={label ? `Search ${label}` : "Search options"}
           onclick={(e) => e.stopPropagation()}
           oninput={handleSearchInput}
           onkeydown={onSearchKeydown}
@@ -521,7 +550,7 @@
         id={listboxId}
         class="nui-select__options"
         role="listbox"
-        aria-multiselectable={multiple ? 'true' : undefined}
+        aria-multiselectable={multiple ? "true" : undefined}
         aria-labelledby={label ? labelId : triggerId}
         aria-activedescendant={!searchable ? activeDescendantId : undefined}
         bind:this={listboxEl}
@@ -529,7 +558,9 @@
         onkeydown={!searchable ? onListboxKeydown : undefined}
       >
         {#each visible as option, idx (option.value)}
-          {@const isSelected = multiple ? selected.includes(option.value) : value === option.value}
+          {@const isSelected = multiple
+            ? selected.includes(option.value)
+            : value === option.value}
           {@const isFocused = focusedIndex === idx}
           <li
             id={`${listboxId}-opt-${idx}`}
@@ -539,11 +570,11 @@
             class:is-focused={isFocused}
             class:is-disabled={option.disabled}
             aria-selected={isSelected}
-            aria-disabled={option.disabled ? 'true' : undefined}
+            aria-disabled={option.disabled ? "true" : undefined}
             data-index={idx}
             onclick={() => selectOption(option)}
             onkeydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
+              if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 selectOption(option);
               }
@@ -561,7 +592,9 @@
             {/if}
           </li>
         {:else}
-          <li class="nui-select__empty" role="presentation">No results found</li>
+          <li class="nui-select__empty" role="presentation">
+            No results found
+          </li>
         {/each}
       </ul>
     </div>
@@ -611,7 +644,9 @@
     font: inherit;
     cursor: pointer;
     box-sizing: border-box;
-    transition: border-color 0.15s ease, outline 0.15s ease;
+    transition:
+      border-color 0.15s ease,
+      outline 0.15s ease;
     text-align: left;
   }
 
@@ -661,7 +696,9 @@
     cursor: pointer;
     opacity: 0.6;
     padding: 0.2rem 0.35rem;
-    transition: opacity 0.15s ease, background 0.15s ease;
+    transition:
+      opacity 0.15s ease,
+      background 0.15s ease;
   }
 
   .nui-select__clear:hover {

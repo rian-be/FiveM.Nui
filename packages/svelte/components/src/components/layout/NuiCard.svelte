@@ -42,9 +42,9 @@
     /** Accessible name for the interactive card when there is no title */
     label?: string;
     /** Heading level for the card title (defaults to 3 -> <h3>) */
-    headingLevel?: 2 | 3 | 4 | 5 | 6;
-    /** Callback fired when the card is clicked. For `selectable` cards, also receives the intended next selection state. */
-    onSelect?: (event: MouseEvent, nextSelected?: boolean) => void;
+    headingLevel?: 1 | 2 | 3 | 4 | 5 | 6 | (number & {});
+    /** Callback fired when the card is clicked or activated via keyboard. For `selectable` cards, also receives the intended next selection state. */
+    onSelect?: (event: MouseEvent | KeyboardEvent, nextSelected?: boolean) => void;
     /** Card body content snippet */
     children?: Snippet;
     /** Header action buttons or badges snippet */
@@ -81,6 +81,14 @@
     computedAriaLabelledby ? undefined : (label ?? ariaLabel)
   );
 
+  const safeHeadingTag = $derived.by(() => {
+    const level = Number(headingLevel);
+    if (Number.isInteger(level) && level >= 1 && level <= 6) {
+      return `h${level}`;
+    }
+    return 'h3';
+  });
+
   // Warn once in development mode if an interactive card lacks an accessible name
   $effect(() => {
     if (!DEV || warnedNoAccessibleName) return;
@@ -92,7 +100,8 @@
     }
   });
 
-  function handleClick(event: MouseEvent) {
+  function handleClick(event: MouseEvent | KeyboardEvent) {
+    if (disabled) return;
     if (selectable) {
       const next = !selected;
       if (!controlled) {
@@ -101,6 +110,14 @@
       onSelect?.(event, next);
     } else {
       onSelect?.(event);
+    }
+  }
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (disabled) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleClick(event);
     }
   }
 </script>
@@ -124,6 +141,7 @@
       aria-labelledby={computedAriaLabelledby}
       aria-label={computedAriaLabel}
       onclick={handleClick}
+      onkeydown={handleKeyDown}
     ></button>
   {/if}
 
@@ -131,7 +149,7 @@
     <div class="nui-card-header">
       {#if icon}<span class="nui-card-icon" aria-hidden="true">{icon}</span>{/if}
       {#if title}
-        <svelte:element this={`h${headingLevel}`} id={titleId} class="nui-card-title">
+        <svelte:element this={safeHeadingTag} id={titleId} class="nui-card-title">
           {title}
         </svelte:element>
       {/if}

@@ -37,6 +37,8 @@
     defaultOpenAll?: boolean;
     /** Initially open ids (trimmed to the first one when `multiple` is false) */
     defaultOpenIds?: string[];
+    /** Currently open section IDs. Supports two-way binding via `bind:openIds`. */
+    openIds?: string[];
     /** Custom panel content. Receives the item. Takes precedence over `item.content` */
     panel?: Snippet<[AccordionItem]>;
   }
@@ -51,53 +53,96 @@
     multiple = false,
     defaultOpenAll = false,
     defaultOpenIds = [],
+    openIds: openIdsProp = $bindable(),
     panel,
     class: className = "",
     ...rest
   }: Props = $props();
 
-  const openIds = new SvelteSet<string>();
-  let initialized = false;
+  const internalOpenIds = new SvelteSet<string>();
+  let hasInitializedDefaults = false;
+
+  function toSafeId(id: string): string {
+    return id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
 
   $effect.pre(() => {
-    if (initialized || items.length === 0) return;
-    initialized = true;
+    if (openIdsProp !== undefined || hasInitializedDefaults || items.length === 0) return;
+    hasInitializedDefaults = true;
 
-    let initial =
-      defaultOpenAll && multiple ? items.map((i) => i.id) : defaultOpenIds;
-    if (!multiple) initial = initial.slice(0, 1);
+    const initial =
+      defaultOpenAll && multiple
+        ? items.map((i) => i.id)
+        : defaultOpenIds;
 
     const known = new Set(items.map((i) => i.id));
-    for (const id of initial) if (known.has(id)) openIds.add(id);
+    const validInitial = initial.filter((id) => known.has(id));
+    const finalInitial = !multiple ? validInitial.slice(0, 1) : validInitial;
+
+    for (const id of finalInitial) internalOpenIds.add(id);
   });
 
-  // Drop ids that no longer exist in `items`
+  // Sync external openIdsProp changes into internalOpenIds, and update openIdsProp if pruned
   $effect(() => {
+    if (openIdsProp === undefined) return;
     const known = new Set(items.map((i) => i.id));
-    for (const id of [...openIds]) if (!known.has(id)) openIds.delete(id);
+    const target = multiple ? openIdsProp : openIdsProp.slice(0, 1);
+    const targetValid = target.filter((id) => known.has(id));
+
+    // If openIdsProp contained invalid items or exceeded single-mode limit, sync back to parent
+    if (
+      targetValid.length !== openIdsProp.length ||
+      !targetValid.every((id, idx) => id === openIdsProp![idx])
+    ) {
+      openIdsProp = [...targetValid];
+    }
+
+    const currentList = [...internalOpenIds];
+    const isSame =
+      currentList.length === targetValid.length &&
+      currentList.every((id) => targetValid.includes(id));
+    if (!isSame) {
+      internalOpenIds.clear();
+      for (const id of targetValid) internalOpenIds.add(id);
+    }
+  });
+
+  // For uncontrolled mode: drop ids that no longer exist in `items`
+  $effect(() => {
+    if (openIdsProp !== undefined) return;
+    const known = new Set(items.map((i) => i.id));
+    for (const id of [...internalOpenIds]) {
+      if (!known.has(id)) {
+        internalOpenIds.delete(id);
+      }
+    }
   });
 
   function toggle(item: AccordionItem) {
     if (item.disabled) return;
 
     const { id } = item;
-    const wasOpen = openIds.has(id);
+    const wasOpen = internalOpenIds.has(id);
     let previousId: string | undefined;
 
     if (multiple) {
-      if (wasOpen) openIds.delete(id);
-      else openIds.add(id);
+      if (wasOpen) internalOpenIds.delete(id);
+      else internalOpenIds.add(id);
     } else {
-      const other = [...openIds].find((x) => x !== id);
+      const other = [...internalOpenIds].find((x) => x !== id);
       previousId = other;
-      openIds.clear();
-      if (!wasOpen) openIds.add(id);
+      internalOpenIds.clear();
+      if (!wasOpen) internalOpenIds.add(id);
+    }
+
+    if (openIdsProp !== undefined) {
+      openIdsProp = [...internalOpenIds];
     }
 
     const payload: AccordionToggleEvent = {
       id,
       isOpen: !wasOpen,
-      openIds: [...openIds],
+      openIds: [...internalOpenIds],
       previousId,
     };
 
@@ -133,9 +178,10 @@
         ".nui-accordion__header:not(:disabled)",
       ),
     ];
-    const current = headers.indexOf(
-      document.activeElement as HTMLButtonElement,
+    const targetBtn = (event.target as HTMLElement)?.closest<HTMLButtonElement>(
+      ".nui-accordion__header",
     );
+    const current = targetBtn ? headers.indexOf(targetBtn) : -1;
     if (current === -1) return;
 
     event.preventDefault();
@@ -151,9 +197,10 @@
 
 <div {...rest} class={["nui-accordion", className]} onkeydown={onKeydown}>
   {#each items as item (item.id)}
-    {@const isOpen = openIds.has(item.id)}
-    {@const headerId = `nui-acc-${uid}-${item.id}-header`}
-    {@const panelId = `nui-acc-${uid}-${item.id}-panel`}
+    {@const isOpen = internalOpenIds.has(item.id)}
+    {@const safeId = toSafeId(item.id)}
+    {@const headerId = `nui-acc-${uid}-${safeId}-header`}
+    {@const panelId = `nui-acc-${uid}-${safeId}-panel`}
     <div class="nui-accordion__item">
       <button
         type="button"
@@ -164,27 +211,32 @@
         aria-expanded={isOpen}
         aria-controls={panelId}
         onclick={() => toggle(item)}
+        onkeydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle(item);
+          }
+        }}
       >
         <span class="nui-accordion__title">{item.title}</span>
         <span class="nui-accordion__icon" aria-hidden="true">▾</span>
       </button>
 
-      {#if isOpen}
-        <div
-          id={panelId}
-          class="nui-accordion__panel"
-          role="region"
-          aria-labelledby={headerId}
-        >
-          <div class="nui-accordion__content">
-            {#if panel}
-              {@render panel(item)}
-            {:else if item.content !== undefined}
-              {item.content}
-            {/if}
-          </div>
+      <div
+        id={panelId}
+        class="nui-accordion__panel"
+        role="region"
+        aria-labelledby={headerId}
+        hidden={!isOpen}
+      >
+        <div class="nui-accordion__content">
+          {#if panel}
+            {@render panel(item)}
+          {:else if item.content !== undefined}
+            {item.content}
+          {/if}
         </div>
-      {/if}
+      </div>
     </div>
   {/each}
 </div>

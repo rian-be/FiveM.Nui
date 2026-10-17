@@ -105,7 +105,7 @@
 <fieldset class="nui-radiogroup" {disabled}>
   {#if label}<legend class="nui-radiogroup__label">{label}</legend>{/if}
 
-  {#each options as option (option.value)}
+  {#each options as option, i (`${option.value}-${i}`)}
     <label
       class="nui-radio-option"
       class:is-disabled={option.disabled || disabled}

@@ -5,12 +5,12 @@
   handling, and dual event synchronization.
 -->
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { nui, isBrowser } from "@fivem-nui/svelte";
   import type { SvelteNuiClient } from "@fivem-nui/svelte";
-  import {
-    validateForm,
-    type ValidationRules,
-  } from "../../composables/useFormValidation";
+  // Universal form validation engine
+  import { validateForm } from "../../composables/useFormValidation";
+  import type { ValidationRules } from "../../composables/useFormValidation";
 
   interface Props {
     /** Main event sent on submit with {@link payload} (or {@link values}). */
@@ -92,6 +92,11 @@
 
   let submitted = $state(false);
   let isSubmitting = false;
+  let isDestroyed = false;
+
+  onDestroy(() => {
+    isDestroyed = true;
+  });
 
   /**
    * Tracks whether the component itself activated `loading`.
@@ -257,10 +262,11 @@
         }
 
         // Re-check state after async confirmation:
+        // - component unmounted while dialog was open
         // - user cancelled
         // - parent set disabled = true while dialog was open
         // - parent set loading = true for an independent operation
-        if (!confirmed || disabled || loading) {
+        if (isDestroyed || !confirmed || disabled || loading) {
           return;
         }
       }
@@ -280,8 +286,11 @@
       //    For atomic semantics, handle both steps in a single C# callback.
       try {
         if (onSubmit) await client.sendAndWait(onSubmit, submitBody);
+        if (isDestroyed) return;
         if (eventName) await client.sendAndWait(eventName, eventBody);
+        if (isDestroyed) return;
       } catch (transportError) {
+        if (isDestroyed) return;
         const message =
           transportError instanceof Error
             ? transportError.message
@@ -291,21 +300,23 @@
         return;
       }
 
-      // 6. Transport succeeded: emit success event safely
-      if (onSubmitSuccess) safeSend(onSubmitSuccess, { success: true });
+      // 6. Transport succeeded: emit success event safely if still mounted
+      if (!isDestroyed && onSubmitSuccess) safeSend(onSubmitSuccess, { success: true });
 
-      if (autoReset) {
+      if (!isDestroyed && autoReset) {
         submitted = false;
       }
 
       // 7. Invoke local onSubmitted callback with eventBody (main event payload)
-      safeSubmitted(eventBody);
+      if (!isDestroyed) safeSubmitted(eventBody);
     } finally {
-      if (ownLoading) {
-        loading = false;
-        ownLoading = false;
+      if (!isDestroyed) {
+        if (ownLoading) {
+          loading = false;
+          ownLoading = false;
+        }
+        isSubmitting = false;
       }
-      isSubmitting = false;
     }
   }
 </script>
@@ -324,7 +335,7 @@
   {#if hasErrors}
     <ul class="nui-form-errors" role="alert" aria-live="polite">
       {#each Object.entries(activeErrors) as [field, message] (field)}
-        <li class="nui-form-error-item">
+        <li class="nui-form-error-item" data-field={field}>
           <span class="nui-form-error-field">{field}:</span>
           {message}
         </li>
