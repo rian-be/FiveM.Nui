@@ -5,7 +5,7 @@
     type KeyboardShortcutSource,
     type KeyboardShortcutsSource,
     type KeyboardShortcutOptions,
-  } from "../../src/composables/useKeyboardShortcut";
+  } from "../../src/composables/useKeyboardShortcut.svelte";
 
   interface Props {
     shortcuts?: KeyboardShortcutsSource;

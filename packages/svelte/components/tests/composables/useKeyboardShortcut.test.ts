@@ -5,7 +5,7 @@ import {
   type KeyboardShortcutOptions,
   type KeyboardShortcutsSource,
   type KeyboardShortcutSource
-} from '../../src/composables/useKeyboardShortcut';
+} from '../../src/composables/useKeyboardShortcut.svelte';
 import KeyboardShortcutHost from '../helpers/KeyboardShortcutHost.svelte';
 
 type MountedComponent = ReturnType<typeof mount>;
@@ -111,10 +111,8 @@ describe('useKeyboardShortcut & useKeyboardShortcuts composables', () => {
       const callbackKey = vi.fn();
       const callbackCode = vi.fn();
 
-      registerShortcuts([
-        { key: ' ', callback: callbackKey },
-        { code: 'Space', callback: callbackCode }
-      ]);
+      registerShortcuts([{ key: ' ', callback: callbackKey }]);
+      registerShortcuts([{ code: 'Space', callback: callbackCode }]);
 
       // Standard browser Space produces key: ' ' and code: 'Space'
       window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
@@ -425,7 +423,7 @@ describe('useKeyboardShortcut & useKeyboardShortcuts composables', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', bubbles: true }));
       expect(callback).not.toHaveBeenCalled();
 
-      input.blur();
+      select.blur();
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', bubbles: true }));
       expect(callback).toHaveBeenCalledTimes(1);
     });
