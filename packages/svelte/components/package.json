@@ -35,11 +35,14 @@
   "peerDependencies": {
     "@fivem-nui/core": "^1.0.0",
     "@fivem-nui/svelte": "^1.0.0",
-    "svelte": "^5.0.0"
+    "svelte": "^5.20.0"
+  },
+  "dependencies": {
+    "esm-env": "^1.0.0"
   },
   "devDependencies": {
     "@sveltejs/package": "^2.0.0",
-    "svelte": "^5.0.0",
+    "svelte": "^5.20.0",
     "typescript": "^7.0.2"
   }
 }

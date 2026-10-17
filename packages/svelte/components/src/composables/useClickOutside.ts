@@ -57,7 +57,7 @@ function mapOptions(param: ClickOutsideInput): NuiClickOutsideParameter {
 }
 
 /**
- * Svelte 5 Action for detecting clicks outside an element.
+ * Action for detecting clicks outside an element.
  *
  * Backed by `@fivem-nui/svelte` with `event.composedPath()` (eliminating the detached
  * DOM node bug in dynamic lists) and `AbortController` lifecycle management.
