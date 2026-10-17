@@ -1,0 +1,67 @@
+{
+  "name": "@fivem-nui/svelte",
+  "version": "1.0.0",
+  "description": "Svelte adapter and toolkit for FiveM NUI communication",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "svelte": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./mock": {
+      "types": "./dist/mock/index.d.ts",
+      "default": "./dist/mock/index.js"
+    },
+    "./actions": {
+      "types": "./dist/actions/index.d.ts",
+      "default": "./dist/actions/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "fivem",
+    "nui",
+    "svelte",
+    "runes",
+    "typescript",
+    "bridge"
+  ],
+  "author": "Rainbe",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "peerDependencies": {
+    "@fivem-nui/core": ">=1.0.0",
+    "svelte": ">=5.0.0"
+  },
+  "dependencies": {
+    "@fivem-nui/core": "file:../../fivem-nui/core",
+    "@fivem-nui/error": "file:../../fivem-nui/error"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@vitest/coverage-v8": "^5.0.4",
+    "happy-dom": "^21.0.3",
+    "svelte": "^5.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0",
+    "vitest": "^5.0.4"
+  }
+}
