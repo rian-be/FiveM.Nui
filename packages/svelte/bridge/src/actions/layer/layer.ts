@@ -14,7 +14,7 @@ import {
 } from './layerStack';
 
 /**
- * Svelte Action for managing an overlay layer in FiveM NUI.
+ * Managing an overlay layer in FiveM NUI.
  *
  * Coordinates:
  * - **Escape key**: Traverses the layer stack top-to-bottom. The topmost active layer that handles Escape
