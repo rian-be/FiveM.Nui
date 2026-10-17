@@ -50,7 +50,8 @@ export { default as NuiTable } from './components/data/NuiTable.svelte';
 export type { Column as NuiTableColumn } from './components/data/NuiTable.svelte';
 
 // Composables
-export { validateForm, validateField, type ValidationRules } from './composables/useFormValidation';
+export { validateForm, validateField } from './composables/useFormValidation';
+export type { ValidationRules } from './composables/useFormValidation';
 export {
   useKeyboardShortcut,
   useKeyboardShortcuts,
@@ -58,7 +59,7 @@ export {
   type KeyboardShortcutOptions,
   type KeyboardShortcutsSource,
   type KeyboardShortcutSource
-} from './composables/useKeyboardShortcut';
+} from './composables/useKeyboardShortcut.svelte';
 export { useClickOutside, useClickOutsideElement, clickOutsideAction, type ClickOutsideOptions } from './composables/useClickOutside';
 export { useLocalStorage, type LocalStorageState } from './composables/useLocalStorage.svelte';
 export { useMediaQuery, useIsMobile, useIsTablet, useIsDesktop, useDarkMode, useReducedMotion, useHighContrast, type MediaQueryState } from './composables/useMediaQuery.svelte';

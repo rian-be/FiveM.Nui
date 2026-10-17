@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     conditions: ['browser'],
     alias: {
+      '@fivem-nui/svelte': resolve(__dirname, 'src/index.ts'),
       '@fivem-nui/core': resolve(__dirname, '../../fivem-nui/core/dist/index.js'),
       '@fivem-nui/error': resolve(__dirname, '../../fivem-nui/error/dist/index.js')
     }
