@@ -1,0 +1,26 @@
+name: Create Repository Visualization
+
+on:
+  push:
+    branches:
+      - main
+      - unstable
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  visualize:
+    name: Generate Repo Diagram
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate and commit diagram
+        uses: githubocto/repo-visualizer@main
+        with:
+          output_file: "diagram.svg"
+          excluded_paths: "node_modules,dist,build,bin,obj,.git,.github,.idea,.vscode,txData"
+          max_depth: 5

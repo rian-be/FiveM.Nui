@@ -1,0 +1,37 @@
+name: Please Star First
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  check-stargazer:
+    name: Close issue opened by non-stargazer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issue if author is not stargazer
+        uses: uhyo/please-star-first@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          close_reason: not_planned
+          message: |
+            ### 👋 Hi @${{ github.event.issue.user.login || github.actor }}, thanks for reaching out!
+
+            > [!NOTE]
+            > **Please star this repository first ⭐**
+
+            We appreciate your interest in **FiveM.Nui** and taking the time to report an issue or suggest a feature.
+
+            To help support the project and motivate ongoing maintenance, we kindly ask that you **give this repository star** before opening an issue. It only takes single click!
+
+            ---
+
+            ### 🚀 What to do next:
+            1. Scroll to the top right of this repository and click the **⭐ Star** button.
+            2. **Reopen this issue** (or leave a quick comment below), and we'll gladly look into it.
+
+            Thank you for your support and understanding! ❤️
+
