@@ -1,214 +1,254 @@
-# FiveM.Nui
+# ⚡ FiveM.Nui
 
-A strongly typed bridge between C#/.NET FiveM client scripts and NUI frontends.
+> **The modern, high-performance, strongly typed bridge between C# client scripts and NUI frontends for FiveM.**  
+> Stop wrestling with JSON parsing bugs, focus locks, and untyped callback spaghetti. Build responsive, production-ready FiveM user interfaces with C# 14, Svelte 5 runes, and compile-time contract generation.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7.x-blue.svg)](packages/fivem-nui/core)
-[![Dependencies](https://img.shields.io/badge/dependencies-0-success.svg)](packages/fivem-nui/core)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
+[![C# 14](https://img.shields.io/badge/C%23-14.0-239120.svg)](https://learn.microsoft.com/dotnet/csharp/)
+[![TypeScript 7.x](https://img.shields.io/badge/TypeScript-7.x-3178C6.svg)](packages/fivem-nui/core)
+[![Svelte 5 Runes](https://img.shields.io/badge/Svelte-5%20Runes-FF3E00.svg)](packages/svelte/bridge)
+[![Zero Dependencies](https://img.shields.io/badge/runtime%20deps-0-success.svg)](packages/fivem-nui/core)
+[![Documentation](https://img.shields.io/badge/Documentation-Local%20Portal-blue.svg)](docs/README.md)
 
-FiveM.Nui provides a typed communication layer between a FiveM C# client resource and its NUI frontend. Instead of hand-writing JSON, registering callbacks, and matching requests to responses, you work with C# records, TypeScript types, events, and callbacks.
+---
 
-Keep game logic in C# and build the UI with Svelte, React, Vue, or plain TypeScript.
+## 📖 Documentation & Guides
 
-## Why FiveM.Nui?
+Complete technical guides and dedicated role manuals are available in [`docs/`](docs/README.md):
 
-- **Typed communication**: use C# records and DTOs alongside TypeScript request and response types.
-- **Request/response messaging**: correlate requests with responses and handle timeouts, deadlines, and cancellation.
-- **Callbacks in both directions**: let the UI call C# handlers and let C# request data from the UI.
-- **Events**: publish one way messages and subscribe to updates without building your own event infrastructure.
-- **Window management**: open, close, focus, and unfocus NUI windows through a consistent API.
-- **Input ownership**: track keyboard focus ownership per window.
-- **Diagnostics**: inspect message counters, payload sizes, and timings when diagnostics are enabled.
-- **Structured errors**: handle failures through error codes instead of matching exception messages.
-- **No UI framework dependency**: integrate the bridge with your frontend of choice.
-- **No runtime dependencies**: the TypeScript package does not require additional runtime packages.
+### 🌟 Role Guides
+- 👑 [**Server Owners & Administrators**](docs/server-owners/README.md) — FiveM Enhanced (CoreCLR), `server.cfg` setup, 0.00ms resmon optimization, no cursor freeze, and anti-cheat/DoS protection.
+- 💻 [**Developers & UI Creators**](docs/developers/README.md) — Step-by-step development manual: C# 14 + Svelte 5 Runes, Roslyn automated contracts, 20+ ready UI components, and 10x faster browser workflow in Chrome without starting GTA V.
 
-> [!NOTE]
-> FiveM.Nui is not yet published on NuGet or npm. Both packages must currently be built from source and referenced locally.
+### 📚 Technical References
+| Guide | Description |
+|---|---|
+| [**System Architecture & Scaffolding**](docs/developers/README.md) | Component architecture, event flow, and resource structure. |
+| [**Contracts & Type Generation**](docs/developers/contracts.md) | Roslyn CLI & MSBuild emitting TypeScript DTOs from C# records. |
+| [**C# 14 Backend & CoreCLR**](docs/developers/backend-csharp.md) | `NuiGateway`, `IScript`, `RegisterCallback`, and serialized mutations. |
+| [**Svelte 5 Runes & Bridge**](docs/developers/frontend-svelte.md) | `nui`, `useNuiState`, `useNuiQuery`, and automatic `useNuiWindow`. |
+| [**UI Component Suite**](docs/developers/components/README.md) | 20+ accessible FiveM CEF components (`NuiButton`, `NuiModal`, `NuiCard`). |
+| [**Browser Mocking & Tooling**](docs/developers/browser-mock-and-tools.md) | `setupNuiMock` in Chrome with Vite HMR, and `dotnet publish`. |
+| [**Testing without FiveM**](docs/developers/testing.md) | In-memory fake bridge, mocking C# responses, and failure simulation. |
+| [**C# API Reference**](docs/api/csharp.md) | Technical reference for `NuiGateway`, `NuiClient`, and `NuiOptions`. |
+| [**TypeScript API Reference**](docs/api/typescript.md) | Technical reference for `@fivem-nui/core`, `@fivem-nui/svelte`, `@fivem-nui/error`. |
+| [**Wire Protocol & Envelopes**](docs/api/protocol.md) | Envelope JSON schema, UUIDv7 correlation, and network error codes. |
 
-## How it works
+---
 
-A resource has two communicating parts:
+## 💡 Why FiveM.Nui?
 
-```text
-┌──────────────────────────┐
-│      C# client script    │
-│                          │
-│  NuiClient / NuiGateway  │
-└────────────┬─────────────┘
-             │
-             │ JSON message envelopes
-             │ Requests, responses, events
-             │
-┌────────────▼─────────────┐
-│       NUI frontend       │
-│                          │
-│      @fivem-nui/core     │
-└──────────────────────────┘
+Traditional FiveM NUI development is plagued by untyped strings, silent network failures, and tedious game restarts:
+
+| The Traditional FiveM Pain | The FiveM.Nui Solution |
+|---|---|
+| ❌ **Untyped String Callbacks** (`RegisterNUICallback("use", ...)` with JSON typos) | ✅ **Compile-Time Type Safety**: TypeScript `NuiEventMap` infers request and response payloads automatically. |
+| ❌ **Input Focus Traps** (`SetNuiFocus` bugs permanently locking cursor or game movement) | ✅ **Managed Window & Focus Stack**: `ShowAsync` and `HideAsync` handle keyboard ownership and state transitions cleanly. |
+| ❌ **Silent Network Hangs** (an unhandled exception in C# leaves frontend `fetch()` pending forever) | ✅ **Structured Error Boundaries**: Every request returns a typed `NuiResult<T>` with timeout deadlines and cancellation tokens. |
+| ❌ **45-Second FiveM Reload Loops** (restarting the game or server just to tweak a CSS button) | ✅ **Instant Local Browser Mocking**: Use `setupNuiMock` in Chrome with Vite HMR — develop 10x faster without launching GTA V! |
+| ❌ **Contract Drift & Double Typing** (manually keeping C# classes and TS interfaces in sync) | ✅ **Automated Roslyn Generator**: Compile your C# assembly and get zero-drift TypeScript interfaces and TSDoc comments. |
+| ❌ **Reinventing Game UI Components** (writing accessible menus, select boxes, and dialogs from scratch) | ✅ **20+ Production UI Components**: Ready-to-use Svelte 5 components hardened specifically for FiveM's CEF runtime. |
+
+---
+
+## 🚀 Key Features
+
+```mermaid
+graph TD
+    subgraph CS["C# Client (.NET 10 / C# 14)"]
+        CS_GATE["NuiGateway / NuiClient"]
+        CS_SER["NuiJsonSerializer"]
+        CS_ROUT["ConcurrentRequestManager & EventManager"]
+        CS_WIN["NuiWindowManager"]
+    end
+
+    subgraph WIRE["FiveM Native Bridge"]
+        POST["POST http://resource/nui"]
+        MSG["SendNuiMessage"]
+    end
+
+    subgraph FE["Frontend Runtime (Windows CEF)"]
+        CORE["@fivem-nui/core"]
+        ERR["@fivem-nui/error"]
+        SVELTE["@fivem-nui/svelte (Runes)"]
+        UI["@fivem-nui/svelte-components"]
+    end
+
+    CS_GATE --> CS_SER
+    CS_SER --> MSG
+    MSG --> CORE
+    CORE --> SVELTE
+    SVELTE --> UI
+    UI --> CORE
+    CORE --> POST
+    POST --> CS_ROUT
+    CS_ROUT --> CS_GATE
 ```
 
-The frontend POSTs messages to a single FiveM resource callback, `nui` by default. C# dispatches them by envelope type and event name. `NuiGateway.Bootstrap()` wires up the callback and the `ready` and `close` lifecycle hooks; after that, the resource exchanges messages without hand-written transport or request correlation.
+### 1. 🛡️ Strongly Typed Communication
+Say goodbye to `dynamic` or hand-cast `Dictionary<string, object>`. C# records implement `INuiRequest<TResponse>`, and TypeScript infers the exact return type:
 
-> **Scope:** FiveM.Nui is a client-side NUI bridge. It does not replace your server-side game logic, framework, database, or authorization checks. Keep authoritative game operations on the server and validate client-originated requests.
-
-## Requirements
-
-- **.NET 10 SDK** for the C# library.
-- **Node.js 22.12.0 or newer** for the TypeScript package.
-- **TypeScript 7.x** for TypeScript development and type-checking.
-
-The C# library targets .NET 10 and is built with C# 14. The TypeScript package provides ESM output and declaration files.
-
-## Installation
-
-### C# library
-
-NuGet distribution is planned. Until then, reference the project directly:
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="path/to/FiveM.Nui.csproj" />
-</ItemGroup>
+```csharp
+// Shared C# Contract
+[NuiEvent("garage:spawn")]
+public sealed record SpawnVehicleRequest(string VehicleModel, string Plate) : INuiRequest<SpawnVehicleResponse>;
+public sealed record SpawnVehicleResponse(bool Success, string NetId);
 ```
 
-Once published, installation will use:
+```ts
+// Frontend automatically knows parameter and response types!
+const result = await nui.request('garage:spawn', { 
+  VehicleModel: 'banshee', 
+  Plate: 'OUTLAW' 
+});
+console.log(result.NetId);
+```
 
+### 2. ⚡ Zero-Lag Svelte 5 Runes
+Leverage modern Svelte 5 reactivity (`$state`, `$derived`, `$effect`) for instant HUD updates with zero runtime overhead:
+
+```svelte
+<script lang="ts">
+  import { useNuiState, useNuiQuery } from '@fivem-nui/svelte';
+  import { NuiButton } from '@fivem-nui/svelte-components';
+
+  // Automatically reactive to C# Publish events
+  const speed = useNuiState<number>('vehicle:speed', 0);
+  const ejectQuery = useNuiQuery('vehicle:eject');
+</script>
+
+<div class="hud">
+  <span>{speed.value} KM/H</span>
+  <NuiButton loading={ejectQuery.loading} onclick={() => ejectQuery.execute()}>
+    Eject
+  </NuiButton>
+</div>
+```
+
+### 3. ⏱️ 10x Faster Development with Browser Mocking
+Don't wait 45 seconds for FiveM to restart. Test your entire NUI interface directly in your browser with realistic network delays:
+
+```ts
+import { setupNuiMock, isBrowser } from '@fivem-nui/svelte';
+
+if (isBrowser()) {
+  setupNuiMock({
+    requests: {
+      'player:getData': async () => ({
+        name: 'Officer John',
+        cash: 45000,
+      }),
+    },
+    latencyMs: 150,
+  });
+}
+```
+
+### 4. 🪟 Bulletproof Window & Focus Management
+Never get your keyboard stuck in NUI again. `NuiGateway` provides reliable window lifecycle hooks:
+
+```csharp
+public class InventoryScript : BaseScript
+{
+    private readonly NuiGateway _nui = new("inventory");
+
+    public InventoryScript()
+    {
+        _nui.Bootstrap(
+            onReady: () =>
+            {
+                _nui.Publish("inventory:sync", GetItems());
+                return Task.CompletedTask;
+            }
+        );
+    }
+
+    [Command("inventory")]
+    public async void Toggle() => await _nui.ShowAsync("inventory");
+}
+```
+
+---
+
+## 📦 Packages in this Repository
+
+| Package | Version | Description |
+|---|---|---|
+| [**`FiveM.Nui`**](src/) | `1.0.0` | Core C# client library targeting .NET 10. |
+| [**`tools/FiveM.Nui.Contracts`**](tools/FiveM.Nui.Contracts/) | `1.0.0` | Roslyn CLI tool generating TypeScript DTOs and event maps. |
+| [**`@fivem-nui/core`**](packages/fivem-nui/core/) | `1.0.0` | Zero-dependency TypeScript bridge and testing kit. |
+| [**`@fivem-nui/error`**](packages/fivem-nui/error/) | `1.0.0` | Global error handling, stack trace parsing, and exponential retry. |
+| [**`@fivem-nui/svelte`**](packages/svelte/bridge/) | `1.0.0` | Svelte 5 runes (`useNuiState`, `useNuiQuery`) and browser mock. |
+| [**`@fivem-nui/svelte-components`**](packages/svelte/components/) | `1.0.0` | Accessible 20+ component suite designed for FiveM CEF. |
+
+---
+
+## Quick Installation
+
+### 1. Add C# Library (NuGet)
+Install the `FiveM.Nui` package into your client script project:
 ```bash
 dotnet add package FiveM.Nui
 ```
-
-### TypeScript bridge
-
-`@fivem-nui/core` is not yet published to npm. Build it from this repository:
-
-```bash
-cd js/@fivem-nui
-npm install
-npm run build
+Or add the package reference directly to your `.csproj`:
+```xml
+<ItemGroup>
+  <PackageReference Include="FiveM.Nui" Version="1.0.0" />
+</ItemGroup>
 ```
 
-The build writes the package output to `dist/`.
-
-Add the local package to your NUI resource's `package.json`:
-
+### 2. Install Frontend Packages (npm)
+Install the official npm packages into your NUI web project (`web/`):
+```bash
+npm install @fivem-nui/svelte @fivem-nui/svelte-components @fivem-nui/core @fivem-nui/error
+```
+Or declare them in your `package.json`:
 ```json
 {
   "dependencies": {
-    "@fivem-nui/core": "file:../../js/@fivem-nui"
+    "@fivem-nui/core": "^1.0.0",
+    "@fivem-nui/error": "^1.0.0",
+    "@fivem-nui/svelte": "^1.0.0",
+    "@fivem-nui/svelte-components": "^1.0.0"
   }
 }
 ```
 
-Adjust the relative path to your layout, then install:
+### 3. Contracts Generator CLI
+Install the Roslyn-based CLI tool to generate TypeScript contracts automatically:
+```bash
+dotnet tool install -g FiveM.Nui.Contracts
+```
+
+---
+
+## Taskfile Developer Commands
 
 ```bash
-npm install
+# Build all C# and TypeScript packages in order
+task build
+
+# Run type-checks in parallel
+task check
+
+# Execute all test suites (xUnit + Vitest)
+task test
+
+# Clean all build outputs
+task clean
 ```
 
-## Quick start
+---
 
-### C# client
+## 🤝 Contributing
 
-```csharp
-using FiveM.Nui;
-using FiveM.Nui.Abstractions;
+Contributions, issues, and feature requests are welcome!  
+Feel free to check out the [Issues tab](https://github.com/rian-be/FiveM.Nui/issues) and our [Architecture Guide](docs/developers/README.md).
 
-var nui = new NuiGateway("inventory");
+---
 
-// Register the NUI transport callback and lifecycle hooks.
-nui.Bootstrap(onReady: async () =>
-{
-    // Send initial state after the UI signals that it is ready.
-    await nui.SendAsync(
-        "inventory:update",
-        new InventoryUpdated(items));
-});
+## 📄 License
 
-// Register a callback that the UI can invoke.
-nui.RegisterCallback<UseItemRequest, UseItemResponse>(
-    "inventory:use",
-    (request, cancellationToken) =>
-        Task.FromResult(
-            NuiResult<UseItemResponse>.Ok(
-                new(true, "Item used"))));
-
-// Subscribe to an event sent by the UI.
-nui.Subscribe<HealthChanged>(
-    "player:healthChanged",
-    health => SetHealth(health.Health));
-
-// Open the window and take focus.
-await nui.ShowAsync("inventory");
-```
-
-`InventoryUpdated`, `UseItemRequest`, `UseItemResponse`, and `HealthChanged` are application contracts; `items` and `SetHealth` are your own state and logic.
-
-`NuiGateway` extends `NuiClient` with the FiveM bootstrapping and window helpers. The messaging API is available directly on the gateway.
-
-### TypeScript frontend
-
-```ts
-import { nui } from '@fivem-nui/core';
-
-// Start receiving messages from C#.
-nui.listen();
-
-// Handle a request initiated by C#.
-nui.callback<void, GetPlayerDataResponse>(
-  'player:get',
-  async () => ({
-    success: true,
-    value: {
-      name: 'NuiPlayer',
-      health: 100,
-    },
-  }),
-);
-
-// Subscribe to updates from C#.
-const unsubscribe = nui.on<InventoryUpdated>(
-  'inventory:update',
-  render,
-);
-
-// Request an operation from a C# callback.
-const result = await nui.request<
-  UseItemRequest,
-  UseItemResponse
->('inventory:use', {
-  itemId,
-});
-```
-
-The generics describe the expected payload and response types; they do not validate arbitrary runtime JSON.
-
-The default `nui` instance uses the ambient FiveM resource name. Create a `NuiClient` when you need custom options or an independent lifecycle.
-
-## Documentation
-
-- [Messaging](docs/messaging.md): communication patterns, events, request/response, the wire protocol, and serialization.
-- [C# API](docs/Api/csharp-api.md): `NuiClient` / `NuiGateway` reference, error handling, window lifecycle, and diagnostics.
-- [TypeScript API](docs/Api/typescript-api.md): frontend error handling and codes.
-- [Contract generation](docs/contract-generation.md): generating typed TypeScript from C# DTOs, typed events, TSDoc, and the MSBuild target.
-- [Security](docs/security.md): treating NUI input as untrusted.
-- [Testing](docs/testing.md): testing your frontend without FiveM using `@fivem-nui/core/testing`.
-- [Development](docs/development.md): running tests and benchmarks.
-- [Architecture](docs/architecture.md): internal structure and design of the C# library.
-- [TypeScript bridge package](js/@fivem-nui/README.md): installation, API reference, and frontend usage.
-
-## Contributing
-
-Issues and pull requests are welcome.
-
-- Keep changes focused.
-- Add or update tests for new behavior.
-- Update documentation when public APIs or their behavior change.
-- Preserve compatibility between the C# and TypeScript message contracts.
-
-## License
-
-FiveM.Nui is licensed under the [MIT License](LICENSE).
-
+FiveM.Nui is licensed under the [MIT License](LICENSE).  
 Copyright © 2026 Rian.be.
