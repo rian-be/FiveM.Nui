@@ -3,9 +3,9 @@ import {
   NuiErrorSeverity,
   type NuiErrorInfo,
   type GlobalErrorListenerOptions
-} from './types.js';
-import { globalErrorHandler } from './handler.js';
-import { formatStackTrace } from './stacktrace.js';
+} from './types';
+import { globalErrorHandler } from './handler';
+import { formatStackTrace } from './stacktrace';
 
 /**
  * Standard keywords indicating DOM / component rendering or lifecycle failures.

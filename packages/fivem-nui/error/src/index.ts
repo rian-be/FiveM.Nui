@@ -10,10 +10,11 @@
  * - Error categorization and history tracking
  */
 
-export * from './types.js';
-export * from './stacktrace.js';
-export * from './handler.js';
-export * from './listeners.js';
+export * from './types';
+export * from './stacktrace';
+export * from './handler';
+export * from './listeners';
+export * from './abort';
 
-import { NuiErrorHandler } from './handler.js';
+import { NuiErrorHandler } from './handler';
 export default NuiErrorHandler;

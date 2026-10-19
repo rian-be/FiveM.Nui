@@ -4,8 +4,9 @@ import {
   type NuiErrorInfo,
   type RetryOptions,
   type ErrorInterceptor
-} from './types.js';
-import { formatStackTrace } from './stacktrace.js';
+} from './types';
+import { formatStackTrace } from './stacktrace';
+import { isAbortError } from './abort';
 
 /**
  * Error handler with retry logic and global interceptors
@@ -98,21 +99,24 @@ export class NuiErrorHandler {
    */
   categorizeError(error: Error | string): NuiErrorCategory {
     const message = typeof error === 'string' ? error : error.message || '';
-    const name = typeof error === 'object' && error !== null && 'name' in error ? (error as any).name : '';
+    const name = typeof error === 'object' && error !== null && 'name' in error ? String((error as any).name) : '';
+    const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as any).code) : '';
+    const lowerMessage = message.toLowerCase();
 
     if (
-      message.includes('ECONNREFUSED') ||
-      message.includes('Failed to fetch') ||
-      message.includes('NetworkError') ||
-      message.includes('network') ||
+      code === 'TRANSPORT' ||
+      code === 'NETWORK' ||
+      lowerMessage.includes('network') ||
+      lowerMessage.includes('econnrefused') ||
+      lowerMessage.includes('failed to fetch') ||
       name === 'NetworkError'
     ) {
       return NuiErrorCategory.NETWORK;
     }
 
     if (
-      message.includes('timeout') ||
-      message.includes('TIMEOUT') ||
+      code === 'TIMEOUT' ||
+      lowerMessage.includes('timeout') ||
       name === 'TimeoutError'
     ) {
       return NuiErrorCategory.TIMEOUT;
@@ -177,6 +181,7 @@ export class NuiErrorHandler {
 
         const shouldContinue =
           attempt < maxRetries &&
+          !isAbortError(error) &&
           (shouldRetry
             ? shouldRetry(lastError)
             : (retryOnTimeout && lastError.category === NuiErrorCategory.TIMEOUT) ||

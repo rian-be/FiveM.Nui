@@ -32,7 +32,7 @@
  *
  * See `docs/testing.md` for usage examples.
  */
-export { createTestNuiClient } from './make-client';
+export { createTestNuiClient, createTestNuiClient as makeClient } from './make-client';
 export type { TestClientOptions, TestNuiClient, SentMessage, CallbackHandler, CallbackMap } from './make-client';
 export { fakeFetch } from './fake-fetch';
 export type { CapturedPost, FakeFetch } from './fake-fetch';
