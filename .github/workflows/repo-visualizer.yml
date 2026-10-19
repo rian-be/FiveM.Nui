@@ -18,9 +18,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate and commit diagram
+      - name: Generate diagram
         uses: githubocto/repo-visualizer@main
         with:
           output_file: "diagram.svg"
-          excluded_paths: "node_modules,dist,build,bin,obj,.git,.github,.idea,.vscode,txData"
-          max_depth: 5
+          should_push: false
+          excluded_paths: "node_modules,dist,build,bin,obj,.git,.github,.idea,.vscode,txData,tests,tools,docs"
+          excluded_globs: "**/*.{lock,png,jpg,svg,ico,targets,props,user,gitignore,sln,slnx,json};**/tests/**;**/*.test.ts;**/*.spec.ts;**/*.d.ts"
+          max_depth: 3
+          # Czysta, wyrazista paleta kolorów
+          file_colors: |
+            {
+              "cs": "#512BD4",
+              "ts": "#3178C6",
+              "svelte": "#FF3E00",
+              "css": "#EC4899",
+              "md": "#6E7681"
+            }
+
+      - name: Apply dark background & theme to SVG
+        run: |
+          node -e '
+            const fs = require("fs");
+            const file = "diagram.svg";
+            if (!fs.existsSync(file)) {
+              console.error("Diagram file not found!");
+              process.exit(0);
+            }
+            let svg = fs.readFileSync(file, "utf8");
+            const darkTheme = `
+            <rect width="100%" height="100%" fill="#0d1117" rx="16"/>
+            <style>
+              text { fill: #e6edf3 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important; }
+              circle[stroke] { stroke: #30363d !important; }
+            </style>
+            `;
+            svg = svg.replace(/(<svg[^>]*>)/i, `$1\n${darkTheme}`);
+            fs.writeFileSync(file, svg, "utf8");
+            console.log("Dark background applied successfully.");
+          '
+
+      - name: Commit and push diagram
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add diagram.svg
+          if git diff --staged --quiet; then
+            echo "No diagram changes to commit"
+          else
+            git commit -m "docs: update repo visualization diagram [skip ci]"
+            git push
+          fi
