@@ -5,6 +5,7 @@ site:
     - type: space
       key: fivem-nui-docs
       title: FiveM.Nui
-      path: docs
+      default: true
+      path: ""
       content:
         directory: ./docs
