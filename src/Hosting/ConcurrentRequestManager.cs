@@ -113,7 +113,7 @@ public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoo
     /// Use <c>PendingRequestTimeout = TimeSpan.Zero</c> to disable this cleanup entirely.
     /// </para>
     /// </remarks>
-    /// <param name="timeout">Maximum age of requests to keep. Use <= TimeSpan.Zero to disable.</param>
+    /// <param name="timeout">Maximum age of requests to keep. Use &lt;= TimeSpan.Zero to disable.</param>
     public int CleanupExpired(TimeSpan timeout)
     {
         if (timeout <= TimeSpan.Zero)
