@@ -17,7 +17,8 @@
     "watch": "tsc --watch",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "keywords": ["fivem", "nui", "error", "handler", "typescript"],
   "author": "Rainbe",
