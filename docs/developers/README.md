@@ -128,3 +128,4 @@ Explore the specialized developer guides:
 3. ⚡ [**Frontend Svelte 5**](frontend-svelte.md) — Svelte 5 Runes: `nui`, `useNuiState`, `useNuiQuery`, and `useNuiWindow`.
 4. 🎨 [**UI Components & Design System**](components/README.md) — 20+ ready components from `@fivem-nui/svelte-components`.
 5. [**Browser Mocking & Build Pipeline**](browser-mock-and-tools.md) — Vite HMR in Chrome without starting GTA V and build steps.
+6. [**Testing without FiveM**](testing.md) — Unit test frontends with `@fivem-nui/core/testing` and captured in-memory traffic.

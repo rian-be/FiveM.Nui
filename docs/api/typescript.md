@@ -13,19 +13,44 @@ icon: file-code
 
 The core zero-dependency transport bridge communicating with FiveM CEF runtime APIs.
 
-### Exports:
+### 1.1 Package Entry Points (Subpaths)
+
+`@fivem-nui/core` provides three distinct subpaths so your production bundles never bundle test mocks or diagnostics overhead:
+
+| Import path | Exposes | Use for |
+| :--- | :--- | :--- |
+| **`@fivem-nui/core`** | `nui`, `NuiClient`, events, callbacks, contracts | Production game UI |
+| **`@fivem-nui/core/testing`** | `createTestNuiClient`, `makeClient`, `fakeFetch` | Unit & component tests without FiveM |
+| **`@fivem-nui/core/diagnostics`** | `NuiDiagnostics` | Performance telemetry & dev overlay panels |
+
+### 1.2 Core Client API (`@fivem-nui/core`)
+
 * **`nui` / `NuiClient`**: Main client orchestrating HTTP POST requests (`https://<resource>/<callback>`) and inbound `window.addEventListener('message')` envelopes.
-  * `nui.request<K>(event, payload)`: Dispatches an RPC request to C# and returns a Promise with the response.
+  * `nui.request<K>(event, payload, timeout?, signal?)`: Dispatches an RPC request to C# and returns a Promise with the response.
   * `nui.send(event, payload)`: Dispatches a one-way event to C# (fire-and-forget).
-  * `nui.notify(callback, payload)`: Dispatches directly to an explicit native callback endpoint (`ready`, `close`).
+  * `nui.sendAndWait(event, payload)`: Dispatches an event and waits for HTTP delivery confirmation.
+  * `nui.notify(callback, payload)`: Dispatches directly to an explicit native callback endpoint (e.g. `ready`, `close`).
+  * `nui.notifyAndWait(callback, payload)`: Dispatches to a callback endpoint and awaits HTTP confirmation.
   * `nui.callback(event, handler)`: Registers a handler answering reverse RPC calls from C# (`RequestAsync`).
   * `nui.on(event, handler)`: Subscribes to `Publish`/`SendAsync` events from C#.
-* **Test Utilities (`@fivem-nui/core/testing`)**:
-  * `makeClient()` / `createTestNuiClient()`: Creates an in-memory `TestNuiClient` with virtual transport without FiveM.
-    * `testNui.emit(eventName, payload)`: Simulates an inbound event from C# to the frontend.
-    * `testNui.deliverResponse(id, success, value, error)`: Resolves a pending `client.request()` promise.
-    * `testNui.getSentMessages()`: Returns the recorded history of all sent HTTP POST envelopes.
-  * `fakeFetch()`: Captures raw HTTP calls in Vitest/Jest unit tests.
+  * `nui.onWindow(handler)`: Listens for window lifecycle actions (`open`, `close`, `focus`, `unfocus`).
+  * `nui.getDiagnostics()`: Returns a snapshot of traffic counters (`sent`, `received`, `resolved`, `rejected`, `failed`).
+
+### 1.3 Diagnostics Telemetry (`@fivem-nui/core/diagnostics`)
+
+`NuiDiagnostics` is a zero-runtime interface describing client activity counters:
+
+```ts
+import type { NuiDiagnostics } from '@fivem-nui/core/diagnostics';
+
+const diagnostics: NuiDiagnostics = nui.getDiagnostics();
+console.log(`Requests: ${diagnostics.resolved} resolved, ${diagnostics.failed} failed`);
+```
+
+### 1.4 Test Utilities (`@fivem-nui/core/testing`)
+
+* `createTestNuiClient(options?)` / `makeClient`: In-memory virtual bridge. See [Testing without FiveM](../developers/testing.md) for full guide.
+* `fakeFetch()`: Standalone HTTP mock transport recorder.
 
 ---
 
