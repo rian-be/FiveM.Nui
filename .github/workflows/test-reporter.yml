@@ -1,0 +1,106 @@
+name: Test Reporter
+
+on:
+  push:
+    branches:
+      - main
+      - unstable
+  pull_request:
+    branches:
+      - main
+      - unstable
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  test-dotnet:
+    name: .NET Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run .NET Tests
+        run: |
+          dotnet test FiveM.Nui.slnx --configuration Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Publish Test Report
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: .NET Unit Tests
+          path: 'TestResults/*.trx'
+          reporter: dotnet-trx
+          report-title: 'FiveM.Nui .NET Test Suite'
+          badge-title: '.NET 10 Tests'
+          use-actions-summary: 'true'
+          list-suites: 'all'
+          list-tests: 'all'
+          max-annotations: '50'
+          fail-on-error: true
+          fail-on-empty: true
+          collapsed: 'auto'
+
+  test-typescript:
+    name: "TS: ${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "@fivem-nui/error"
+            dir: "packages/fivem-nui/error"
+          - name: "@fivem-nui/core"
+            dir: "packages/fivem-nui/core"
+          - name: "@fivem-nui/svelte"
+            dir: "packages/svelte/bridge"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build local dependencies
+        if: matrix.name == '@fivem-nui/svelte'
+        run: |
+          npm --prefix packages/fivem-nui/error ci || npm --prefix packages/fivem-nui/error install
+          npm --prefix packages/fivem-nui/error run build
+          npm --prefix packages/fivem-nui/core ci || npm --prefix packages/fivem-nui/core install
+          npm --prefix packages/fivem-nui/core run build
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.dir }}
+        run: npm ci || npm install
+
+      - name: Run Vitest
+        working-directory: ${{ matrix.dir }}
+        run: npx vitest run --reporter=default --reporter=junit --outputFile=junit.xml
+
+      - name: Publish Test Report
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: "${{ matrix.name }} Tests"
+          path: "${{ matrix.dir }}/junit.xml"
+          reporter: java-junit
+          report-title: "FiveM.Nui ${{ matrix.name }} Test Suite"
+          badge-title: "${{ matrix.name }}"
+          use-actions-summary: 'true'
+          list-suites: 'all'
+          list-tests: 'all'
+          max-annotations: '50'
+          fail-on-error: true
+          fail-on-empty: false
+          collapsed: 'auto'

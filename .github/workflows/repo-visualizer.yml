@@ -25,7 +25,7 @@ jobs:
           should_push: false
           excluded_paths: "node_modules,dist,build,bin,obj,.git,.github,.idea,.vscode,txData,tests,tools,docs"
           excluded_globs: "**/*.{lock,png,jpg,svg,ico,targets,props,user,gitignore,sln,slnx,json};**/tests/**;**/*.test.ts;**/*.spec.ts;**/*.d.ts"
-          max_depth: 3
+          max_depth: 7
           # Czysta, wyrazista paleta kolorów
           file_colors: |
             {
@@ -46,16 +46,28 @@ jobs:
               process.exit(0);
             }
             let svg = fs.readFileSync(file, "utf8");
+
+            // 1. Zamień białe tło folderów (isParent) na ciemny GitHub card tint
+            svg = svg.replace(/fill="white"/gi, "fill=\"#161b22\" fill-opacity=\"0.6\"");
+            svg = svg.replace(/fill="#ffffff"/gi, "fill=\"#161b22\" fill-opacity=\"0.6\"");
+            svg = svg.replace(/fill="#fff"/gi, "fill=\"#161b22\" fill-opacity=\"0.6\"");
+            svg = svg.replace(/stroke="#CED6E0"/gi, "stroke=\"#30363d\"");
+
+            // 2. Wstrzyknij ciemne tło canvasu oraz reguły CSS
             const darkTheme = `
             <rect width="100%" height="100%" fill="#0d1117" rx="16"/>
             <style>
               text { fill: #e6edf3 !important; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important; }
-              circle[stroke] { stroke: #30363d !important; }
+              circle[fill="white"], circle[fill="#ffffff"], circle[fill="#fff"], circle[stroke="#CED6E0"] {
+                fill: #161b22 !important;
+                fill-opacity: 0.6 !important;
+                stroke: #30363d !important;
+              }
             </style>
             `;
             svg = svg.replace(/(<svg[^>]*>)/i, `$1\n${darkTheme}`);
             fs.writeFileSync(file, svg, "utf8");
-            console.log("Dark background applied successfully.");
+            console.log("Dark background and dark circles applied successfully.");
           '
 
       - name: Commit and push diagram
