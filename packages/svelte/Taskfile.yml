@@ -1,0 +1,136 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Build all Svelte packages
+    cmds:
+      - task: build
+
+  build:
+    desc: Build @fivem-nui/svelte (bridge) and @fivem-nui/svelte-components in dependency order
+    cmds:
+      - task: build:bridge
+      - task: build:components
+
+  build:bridge:
+    desc: Build @fivem-nui/svelte bridge package
+    dir: ./bridge
+    sources:
+      - src/**/*
+      - tsconfig.json
+      - package.json
+    generates:
+      - dist/**/*
+    cmds:
+      - npm run build
+
+  build:components:
+    desc: Build @fivem-nui/svelte-components package
+    dir: ./components
+    sources:
+      - src/**/*
+      - tsconfig.json
+      - svelte.config.js
+      - package.json
+    generates:
+      - dist/**/*
+    cmds:
+      - npm run build
+
+  watch:
+    desc: Watch mode for Svelte bridge package
+    dir: ./bridge
+    cmds:
+      - npm run watch
+
+  check:
+    desc: Typecheck all Svelte packages in parallel
+    deps:
+      - check:bridge
+      - check:components
+
+  check:bridge:
+    desc: Typecheck @fivem-nui/svelte bridge
+    dir: ./bridge
+    sources:
+      - src/**/*
+      - tsconfig.json
+    cmds:
+      - npm run check
+
+  check:components:
+    desc: Typecheck @fivem-nui/svelte-components
+    dir: ./components
+    sources:
+      - src/**/*
+      - tsconfig.json
+    cmds:
+      - npm run check
+
+  test:
+    desc: Run tests across Svelte packages
+    cmds:
+      - task: test:bridge
+      - task: test:components
+
+  test:bridge:
+    desc: Run tests in @fivem-nui/svelte bridge
+    dir: ./bridge
+    cmds:
+      - npm run test
+
+  test:components:
+    desc: Run tests in @fivem-nui/svelte-components
+    dir: ./components
+    cmds:
+      - npx --prefix ../bridge vitest run --config ../bridge/vitest.config.ts
+
+  coverage:
+    desc: Run test coverage in @fivem-nui/svelte bridge
+    dir: ./bridge
+    cmds:
+      - npm run coverage
+
+  install:
+    desc: Install dependencies in bridge and components
+    deps:
+      - install:bridge
+      - install:components
+
+  install:bridge:
+    desc: Install dependencies in bridge
+    dir: ./bridge
+    status:
+      - test -d node_modules
+    cmds:
+      - npm install
+
+  install:components:
+    desc: Install dependencies in components
+    dir: ./components
+    status:
+      - test -d node_modules
+    cmds:
+      - npm install
+
+  clean:
+    desc: Clean build outputs in Svelte packages
+    cmds:
+      - task: clean:bridge
+      - task: clean:components
+
+  clean:bridge:
+    dir: ./bridge
+    cmds:
+      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
+        platforms: [windows]
+      - cmd: rm -rf dist
+        platforms: [linux, darwin]
+
+  clean:components:
+    dir: ./components
+    cmds:
+      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
+        platforms: [windows]
+      - cmd: rm -rf dist
+        platforms: [linux, darwin]

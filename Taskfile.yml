@@ -1,0 +1,82 @@
+version: '3'
+
+output: prefixed
+
+includes:
+  fivem-nui:
+    taskfile: ./packages/fivem-nui/Taskfile.yml
+    dir: ./packages/fivem-nui
+    aliases: [nui]
+  svelte:
+    taskfile: ./packages/svelte/Taskfile.yml
+    dir: ./packages/svelte
+
+tasks:
+  default:
+    desc: Build all TypeScript packages and the .NET solution
+    cmds:
+      - task: build
+
+  build:
+    desc: Build all packages in dependency order, followed by the .NET solution
+    cmds:
+      - task: build:packages
+      - task: build:dotnet
+
+  build:packages:
+    desc: Build all TypeScript packages (fivem-nui -> svelte) in dependency order
+    cmds:
+      - task: fivem-nui:build
+      - task: svelte:build
+
+  build:dotnet:
+    desc: Build the .NET solution
+    cmds:
+      - dotnet build FiveM.Nui.slnx -c Release
+
+  check:
+    desc: Typecheck all TypeScript packages in parallel
+    deps:
+      - fivem-nui:check
+      - svelte:check
+
+  test:
+    desc: Run all tests (TypeScript packages + .NET test suites)
+    cmds:
+      - task: test:packages
+      - task: test:dotnet
+
+  test:packages:
+    desc: Run tests across all TypeScript packages
+    cmds:
+      - task: fivem-nui:test
+      - task: svelte:test
+
+  test:dotnet:
+    desc: Run .NET test suites
+    cmds:
+      - dotnet test FiveM.Nui.slnx
+
+  install:
+    desc: Install npm dependencies in all packages in parallel
+    deps:
+      - fivem-nui:install
+      - svelte:install
+
+  clean:
+    desc: Clean build artifacts across all packages and .NET solution
+    cmds:
+      - task: fivem-nui:clean
+      - task: svelte:clean
+      - dotnet clean FiveM.Nui.slnx
+
+  coverage:
+    desc: Run test coverage across all packages
+    cmds:
+      - task: fivem-nui:coverage
+      - task: svelte:coverage
+
+  contracts:
+    desc: Build the FiveM.Nui.Contracts Roslyn generator CLI tool
+    cmds:
+      - dotnet build tools/FiveM.Nui.Contracts/FiveM.Nui.Contracts.csproj -c Release

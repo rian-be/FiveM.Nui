@@ -1,0 +1,158 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Build all fivem-nui packages
+    cmds:
+      - task: build
+
+  build:
+    desc: Build @fivem-nui/error and @fivem-nui/core in dependency order
+    cmds:
+      - task: build:error
+      - task: build:core
+
+  build:error:
+    desc: Build @fivem-nui/error
+    dir: ./error
+    sources:
+      - src/**/*
+      - tsconfig.json
+      - package.json
+    generates:
+      - dist/**/*
+    cmds:
+      - npm run build
+
+  build:core:
+    desc: Build @fivem-nui/core
+    dir: ./core
+    sources:
+      - src/**/*
+      - tsconfig.json
+      - tsconfig.types.json
+      - package.json
+    generates:
+      - dist/**/*
+    cmds:
+      - npm run build
+
+  watch:
+    desc: Watch mode for fivem-nui packages
+    cmds:
+      - task: watch:core
+
+  watch:error:
+    desc: Watch mode for @fivem-nui/error
+    dir: ./error
+    cmds:
+      - npm run watch
+
+  watch:core:
+    desc: Watch mode for @fivem-nui/core
+    dir: ./core
+    cmds:
+      - npm run watch
+
+  check:
+    desc: Typecheck all fivem-nui packages in parallel
+    deps:
+      - check:error
+      - check:core
+
+  check:error:
+    desc: Typecheck @fivem-nui/error
+    dir: ./error
+    sources:
+      - src/**/*
+      - tsconfig.json
+    cmds:
+      - npm run check
+
+  check:core:
+    desc: Typecheck @fivem-nui/core
+    dir: ./core
+    sources:
+      - src/**/*
+      - tsconfig.json
+      - tsconfig.types.json
+    cmds:
+      - npm run check
+
+  test:
+    desc: Run tests in error and core packages
+    cmds:
+      - task: test:error
+      - task: test:core
+
+  test:error:
+    desc: Run tests in @fivem-nui/error
+    dir: ./error
+    cmds:
+      - npm run test
+
+  test:core:
+    desc: Run tests in @fivem-nui/core
+    dir: ./core
+    cmds:
+      - npm run test
+
+  coverage:
+    desc: Run test coverage in error and core packages
+    cmds:
+      - task: coverage:error
+      - task: coverage:core
+
+  coverage:error:
+    desc: Run test coverage in @fivem-nui/error
+    dir: ./error
+    cmds:
+      - npm run coverage
+
+  coverage:core:
+    desc: Run test coverage in @fivem-nui/core
+    dir: ./core
+    cmds:
+      - npm run coverage
+
+  install:
+    desc: Install dependencies in error and core packages
+    deps:
+      - install:error
+      - install:core
+
+  install:error:
+    dir: ./error
+    status:
+      - test -d node_modules
+    cmds:
+      - npm install
+
+  install:core:
+    dir: ./core
+    status:
+      - test -d node_modules
+    cmds:
+      - npm install
+
+  clean:
+    desc: Clean build outputs in error and core packages
+    cmds:
+      - task: clean:error
+      - task: clean:core
+
+  clean:error:
+    dir: ./error
+    cmds:
+      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
+        platforms: [windows]
+      - cmd: rm -rf dist
+        platforms: [linux, darwin]
+
+  clean:core:
+    dir: ./core
+    cmds:
+      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
+        platforms: [windows]
+      - cmd: rm -rf dist
+        platforms: [linux, darwin]

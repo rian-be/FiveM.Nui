@@ -1,4 +1,4 @@
-$schema: https://api.gitbook.com/openapi.yaml#/components/schemas/GitSyncSiteConfig
+$schema: https://api.gitbook.com/gitbook-docs.yaml
 site:
   title: FiveM.Nui Documentation
   structure:
@@ -6,6 +6,6 @@ site:
       key: fivem-nui-docs
       title: FiveM.Nui
       default: true
-      path: ""
+      path: docs
       content:
         directory: ./docs

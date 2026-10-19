@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "build": "svelte-package -i src -o dist",
-    "check": "tsc --noEmit --skipLibCheck --moduleResolution bundler --allowJs --esModuleInterop --strict"
+    "check": "tsc --noEmit --skipLibCheck --moduleResolution bundler --allowJs --esModuleInterop --strict",
+    "test": "npx --prefix ../bridge vitest run --config ../bridge/vitest.config.ts"
   },
   "keywords": [
     "fivem",
