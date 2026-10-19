@@ -21,7 +21,8 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      reporter: ['text', 'html', 'json-summary', 'json'],
+      reportOnFailure: true,
       include: ['src/**/*.ts', 'src/**/*.svelte.ts'],
       exclude: ['src/**/*.d.ts']
     }

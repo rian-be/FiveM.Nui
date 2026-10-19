@@ -15,6 +15,7 @@ permissions:
   contents: read
   actions: read
   checks: write
+  pull-requests: write
 
 jobs:
   test-dotnet:
@@ -28,6 +29,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Run .NET Tests
         continue-on-error: true
@@ -72,6 +81,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'packages/**/package-lock.json'
 
       - name: Build local dependencies
         if: matrix.name == '@fivem-nui/svelte'
@@ -85,10 +96,10 @@ jobs:
         working-directory: ${{ matrix.dir }}
         run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
-      - name: Run Vitest
+      - name: Run Vitest with Coverage
         working-directory: ${{ matrix.dir }}
         continue-on-error: true
-        run: npx vitest run --reporter=default --reporter=junit --outputFile=junit.xml
+        run: npx vitest run --reporter=default --reporter=junit --outputFile=junit.xml --coverage.enabled=true
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v3
@@ -106,3 +117,12 @@ jobs:
           fail-on-error: true
           fail-on-empty: false
           collapsed: 'auto'
+
+      - name: Publish Vitest Coverage Report
+        uses: davelosert/vitest-coverage-report-action@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: "${{ matrix.name }}"
+          working-directory: ${{ matrix.dir }}
+          file-coverage-mode: changes
+          threshold-icons: "{0: '🔴', 70: '🟠', 90: '🟢'}"
