@@ -97,7 +97,7 @@ function untyped(client: NuiClient): {
  * testNui.emit('inventory:updated', { items: [{ id: 'water', count: 3 }] });
  * ```
  *
- * See `docs/testing.md` for usage examples.
+ * See `docs/developers/testing.md` for usage examples.
  */
 export function createTestNuiClient(options: TestClientOptions = {}): TestNuiClient {
   const transport = fakeFetch();

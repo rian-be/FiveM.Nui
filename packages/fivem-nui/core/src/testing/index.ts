@@ -30,7 +30,7 @@
  * testNui.dispose();
  * ```
  *
- * See `docs/testing.md` for usage examples.
+ * See `docs/developers/testing.md` for usage examples.
  */
 export { createTestNuiClient, createTestNuiClient as makeClient } from './make-client';
 export type { TestClientOptions, TestNuiClient, SentMessage, CallbackHandler, CallbackMap } from './make-client';

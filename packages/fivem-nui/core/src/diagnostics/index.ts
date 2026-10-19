@@ -5,6 +5,6 @@
  * bridge can be inspected with the same vocabulary.
  *
  * It is type-only: `import` and `import type` both work, and both erase at
- * compile time. See `docs/entry-points.md` for the import forms.
+ * compile time. See `docs/api/typescript.md` for the import forms.
  */
 export type { NuiDiagnostics } from './NuiDiagnostics';
