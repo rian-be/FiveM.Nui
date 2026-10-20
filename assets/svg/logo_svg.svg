@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Icon background -->
+    <linearGradient id="icon-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181D" />
+      <stop offset="100%" stop-color="#0C0C0F" />
+    </linearGradient>
+
+    <!-- Main NUI layer gradient -->
+    <linearGradient id="icon-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF7A3D" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+
+    <!-- Layer drop shadow for separation -->
+    <filter id="layer-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-8" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.55" />
+    </filter>
+  </defs>
+
+  <!-- Squircle base (512x512) -->
+  <rect width="512" height="512" rx="115" fill="url(#icon-bg)" />
+  <rect x="6" y="6" width="500" height="500" rx="109" fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="4" />
+
+  <!-- 
+    MATHEMATICAL CENTERING:
+    Layer group size: 300px (width) x 290px (height)
+    Margin X: (512 - 300) / 2 = 106px
+    Margin Y: (512 - 290) / 2 = 111px
+  -->
+  <g transform="translate(106, 209)">
+    
+    <!-- LAYER 1: Back (Game engine / C#) -->
+    <g transform="translate(0, -50) skewY(-16)">
+      <rect x="0" y="0" width="168" height="136" rx="12" fill="#18181D" stroke="#3F3F46" stroke-width="3" />
+      <!-- Title bar -->
+      <circle cx="16" cy="16" r="3.5" fill="#52525B" />
+      <circle cx="27" cy="16" r="3.5" fill="#52525B" />
+      <circle cx="38" cy="16" r="3.5" fill="#52525B" />
+      <line x1="0" y1="30" x2="168" y2="30" stroke="#27272A" stroke-width="2" />
+      <!-- Code lines -->
+      <rect x="16" y="46" width="56" height="6" rx="3" fill="#3F3F46" />
+      <rect x="16" y="62" width="96" height="6" rx="3" fill="#27272A" />
+      <rect x="16" y="78" width="76" height="6" rx="3" fill="#27272A" />
+      <rect x="16" y="94" width="44" height="6" rx="3" fill="#3F3F46" />
+    </g>
+
+    <!-- LAYER 2: Middle (Bridge / Communication) -->
+    <g transform="translate(66, -15) skewY(-16)" filter="url(#layer-shadow)">
+      <rect x="0" y="0" width="168" height="136" rx="12" fill="#202027" stroke="#71717A" stroke-width="3" />
+      <!-- Title bar -->
+      <circle cx="16" cy="16" r="3.5" fill="#A1A1AA" />
+      <circle cx="27" cy="16" r="3.5" fill="#A1A1AA" />
+      <circle cx="38" cy="16" r="3.5" fill="#A1A1AA" />
+      <line x1="0" y1="30" x2="168" y2="30" stroke="#3F3F46" stroke-width="2" />
+      <!-- Code lines / JSON -->
+      <rect x="16" y="46" width="68" height="6" rx="3" fill="#71717A" />
+      <rect x="28" y="62" width="104" height="6" rx="3" fill="#52525B" />
+      <rect x="28" y="78" width="80" height="6" rx="3" fill="#52525B" />
+      <rect x="16" y="94" width="52" height="6" rx="3" fill="#71717A" />
+    </g>
+
+    <!-- LAYER 3: Front (NUI Interface) -->
+    <g transform="translate(132, 20) skewY(-16)" filter="url(#layer-shadow)">
+      <rect x="0" y="0" width="168" height="136" rx="12" fill="url(#icon-orange)" stroke="#FF9466" stroke-width="2" />
+      <!-- NUI window title bar -->
+      <circle cx="16" cy="16" r="3.5" fill="#FAFAFA" />
+      <circle cx="27" cy="16" r="3.5" fill="#FAFAFA" />
+      <circle cx="38" cy="16" r="3.5" fill="#FAFAFA" />
+      <line x1="0" y1="30" x2="168" y2="30" stroke="#FAFAFA" stroke-opacity="0.2" stroke-width="2" />
+      
+      <!-- UI Elements (Sidebar + Cards as on render) -->
+      <!-- Left sidebar -->
+      <rect x="16" y="46" width="38" height="8" rx="4" fill="#18181D" fill-opacity="0.65" />
+      <rect x="16" y="62" width="30" height="6" rx="3" fill="#FAFAFA" fill-opacity="0.7" />
+      <rect x="16" y="74" width="34" height="6" rx="3" fill="#FAFAFA" fill-opacity="0.5" />
+      <rect x="16" y="86" width="24" height="6" rx="3" fill="#FAFAFA" fill-opacity="0.5" />
+      
+      <!-- Right main module + 2 buttons at the bottom -->
+      <rect x="66" y="44" width="86" height="46" rx="6" fill="#FAFAFA" fill-opacity="0.28" />
+      <rect x="66" y="98" width="40" height="22" rx="5" fill="#FAFAFA" />
+      <rect x="112" y="98" width="40" height="22" rx="5" fill="#FAFAFA" fill-opacity="0.85" />
+    </g>
+
+  </g>
+</svg>

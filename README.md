@@ -1,7 +1,4 @@
-# ⚡ FiveM.Nui
-
-> **The modern, high-performance, strongly typed bridge between C# client scripts and NUI frontends for FiveM.**  
-> Stop wrestling with JSON parsing bugs, focus locks, and untyped callback spaghetti. Build responsive, production-ready FiveM user interfaces with C# 14, Svelte 5 runes, and compile-time contract generation.
+![FiveM.Nui Banner](assets/svg/banner_fivem_nui.svg)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
