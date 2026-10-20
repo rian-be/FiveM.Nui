@@ -1,6 +1,10 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
 version: '3'
 
 output: prefixed
+
+vars:
+  DIST_DIR: '{{.ROOT_DIR}}/dist'
 
 includes:
   fivem-nui:
@@ -34,6 +38,25 @@ tasks:
     cmds:
       - dotnet build FiveM.Nui.slnx -c Release
 
+  pack:
+    desc: Pack all packages (npm .tgz and NuGet .nupkg) into dist/
+    cmds:
+      - task: pack:packages
+      - task: pack:dotnet
+
+  pack:packages:
+    desc: Pack all TypeScript packages into .tgz archives in dist/
+    cmds:
+      - mkdir -p "{{.DIST_DIR}}"
+      - task: fivem-nui:pack
+      - task: svelte:pack
+
+  pack:dotnet:
+    desc: Pack all .NET NuGet packages into dist/
+    cmds:
+      - mkdir -p "{{.DIST_DIR}}"
+      - dotnet pack FiveM.Nui.slnx -c Release -o "{{.DIST_DIR}}"
+
   check:
     desc: Typecheck all TypeScript packages in parallel
     deps:
@@ -57,6 +80,12 @@ tasks:
     cmds:
       - dotnet test FiveM.Nui.slnx
 
+  coverage:
+    desc: Run test coverage across all packages
+    cmds:
+      - task: fivem-nui:coverage
+      - task: svelte:coverage
+
   install:
     desc: Install npm dependencies in all packages in parallel
     deps:
@@ -64,17 +93,17 @@ tasks:
       - svelte:install
 
   clean:
-    desc: Clean build artifacts across all packages and .NET solution
+    desc: Clean build artifacts across all packages, .NET solution, and dist/
     cmds:
       - task: fivem-nui:clean
       - task: svelte:clean
       - dotnet clean FiveM.Nui.slnx
+      - rm -rf "{{.DIST_DIR}}"
 
-  coverage:
-    desc: Run test coverage across all packages
+  benchmarks:
+    desc: Run .NET performance benchmarks
     cmds:
-      - task: fivem-nui:coverage
-      - task: svelte:coverage
+      - dotnet run -c Release --project tests/FiveM.Nui.Benchmarks/FiveM.Nui.Benchmarks.csproj
 
   contracts:
     desc: Build the FiveM.Nui.Contracts Roslyn generator CLI tool

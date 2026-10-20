@@ -4,7 +4,16 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>FiveM.Nui</PackageId>
+    <Description>Modern, high-performance, strongly typed bridge between C# client scripts and NUI frontends for FiveM.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>logo_fivem_nui_180.png</PackageIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" Condition="Exists('..\README.md')" />
+    <None Include="..\assets\img\logo_fivem_nui_180.png" Pack="true" PackagePath="\" Visible="false" Condition="Exists('..\assets\img\logo_fivem_nui_180.png')" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CitizenFX.FiveM.Client" Version="0.0.4-alpha" PrivateAssets="all" />

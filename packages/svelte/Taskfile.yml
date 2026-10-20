@@ -1,4 +1,8 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
 version: '3'
+
+vars:
+  DIST_DIR: '{{.ROOT_DIR}}/dist'
 
 tasks:
   default:
@@ -36,6 +40,24 @@ tasks:
       - dist/**/*
     cmds:
       - npm run build
+
+  pack:
+    desc: Pack @fivem-nui/svelte and @fivem-nui/svelte-components into .tgz archives in dist/
+    cmds:
+      - task: pack:bridge
+      - task: pack:components
+
+  pack:bridge:
+    desc: Pack @fivem-nui/svelte into .tgz archive
+    dir: ./bridge
+    cmds:
+      - npm pack --pack-destination "{{.DIST_DIR}}"
+
+  pack:components:
+    desc: Pack @fivem-nui/svelte-components into .tgz archive
+    dir: ./components
+    cmds:
+      - npm pack --pack-destination "{{.DIST_DIR}}"
 
   watch:
     desc: Watch mode for Svelte bridge package
@@ -122,15 +144,9 @@ tasks:
   clean:bridge:
     dir: ./bridge
     cmds:
-      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
-        platforms: [windows]
-      - cmd: rm -rf dist
-        platforms: [linux, darwin]
+      - rm -rf dist
 
   clean:components:
     dir: ./components
     cmds:
-      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
-        platforms: [windows]
-      - cmd: rm -rf dist
-        platforms: [linux, darwin]
+      - rm -rf dist

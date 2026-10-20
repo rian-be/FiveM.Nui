@@ -11,7 +11,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
@@ -20,10 +23,18 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage"
   },
-  "keywords": ["fivem", "nui", "error", "handler", "typescript"],
+  "keywords": [
+    "fivem",
+    "nui",
+    "error",
+    "handler",
+    "typescript"
+  ],
   "author": "Rainbe",
   "license": "MIT",
-  "engines": { "node": ">=22.12.0" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "devDependencies": {
     "@vitest/coverage-v8": "^5.0.4",
     "typescript": "^7.0.2",

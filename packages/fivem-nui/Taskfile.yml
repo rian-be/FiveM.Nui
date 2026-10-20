@@ -1,4 +1,8 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
 version: '3'
+
+vars:
+  DIST_DIR: '{{.ROOT_DIR}}/dist'
 
 tasks:
   default:
@@ -36,6 +40,24 @@ tasks:
       - dist/**/*
     cmds:
       - npm run build
+
+  pack:
+    desc: Pack @fivem-nui/error and @fivem-nui/core into .tgz archives in dist/
+    cmds:
+      - task: pack:error
+      - task: pack:core
+
+  pack:error:
+    desc: Pack @fivem-nui/error into .tgz archive
+    dir: ./error
+    cmds:
+      - npm pack --pack-destination "{{.DIST_DIR}}"
+
+  pack:core:
+    desc: Pack @fivem-nui/core into .tgz archive
+    dir: ./core
+    cmds:
+      - npm pack --pack-destination "{{.DIST_DIR}}"
 
   watch:
     desc: Watch mode for fivem-nui packages
@@ -144,15 +166,9 @@ tasks:
   clean:error:
     dir: ./error
     cmds:
-      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
-        platforms: [windows]
-      - cmd: rm -rf dist
-        platforms: [linux, darwin]
+      - rm -rf dist
 
   clean:core:
     dir: ./core
     cmds:
-      - cmd: powershell -NoProfile -Command "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue"
-        platforms: [windows]
-      - cmd: rm -rf dist
-        platforms: [linux, darwin]
+      - rm -rf dist

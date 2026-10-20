@@ -9,7 +9,14 @@
     <ToolCommandName>fivem-nui-contracts</ToolCommandName>
     <PackageId>FiveM.Nui.Contracts</PackageId>
     <Description>Generates TypeScript contract declarations from C# NUI DTOs.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>logo_fivem_nui_180.png</PackageIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" Visible="false" Condition="Exists('README.md')" />
+    <None Include="..\..\assets\img\logo_fivem_nui_180.png" Pack="true" PackagePath="\" Visible="false" Condition="Exists('..\..\assets\img\logo_fivem_nui_180.png')" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FiveM.Nui.csproj" />
