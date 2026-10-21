@@ -1,4 +1,8 @@
 .idea/
+.vscode/
+.vs/
+.gemini/
+.agents/
 *.user
 *.suo
 *.userprefs
@@ -10,6 +14,9 @@
 [Oo]bj/
 publish/
 Generated_*.cs
+*.nupkg
+*.snupkg
+*.tgz
 
 # Node & JavaScript / TypeScript
 node_modules/
@@ -19,6 +26,7 @@ junit.xml
 package-lock.json
 .turbo/
 .svelte-kit/
+.task/
 
 # FiveM Server Runtimes, Caches & Demo
 /txData/
