@@ -44,16 +44,27 @@
   ],
   "author": "Rainbe",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rian-be/FiveM.Nui.git",
+    "directory": "packages/svelte/bridge"
+  },
+  "bugs": {
+    "url": "https://github.com/rian-be/FiveM.Nui/issues"
+  },
+  "homepage": "https://github.com/rian-be/FiveM.Nui/tree/main/packages/svelte/bridge#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.12.0"
   },
   "peerDependencies": {
-    "@fivem-nui/core": ">=1.0.0",
     "svelte": ">=5.0.0"
   },
   "dependencies": {
-    "@fivem-nui/core": "file:../../fivem-nui/core",
-    "@fivem-nui/error": "file:../../fivem-nui/error"
+    "@fivem-nui/core": "^1.0.0",
+    "@fivem-nui/error": "^1.0.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

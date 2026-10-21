@@ -32,6 +32,18 @@
   ],
   "author": "Rainbe",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rian-be/FiveM.Nui.git",
+    "directory": "packages/fivem-nui/error"
+  },
+  "bugs": {
+    "url": "https://github.com/rian-be/FiveM.Nui/issues"
+  },
+  "homepage": "https://github.com/rian-be/FiveM.Nui/tree/main/packages/fivem-nui/error#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.12.0"
   },

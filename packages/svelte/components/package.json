@@ -30,6 +30,18 @@
   ],
   "author": "Rainbe",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rian-be/FiveM.Nui.git",
+    "directory": "packages/svelte/components"
+  },
+  "bugs": {
+    "url": "https://github.com/rian-be/FiveM.Nui/issues"
+  },
+  "homepage": "https://github.com/rian-be/FiveM.Nui/tree/main/packages/svelte/components#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22.12.0"
   },
