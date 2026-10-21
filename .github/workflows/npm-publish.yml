@@ -1,0 +1,120 @@
+name: Publish NPM Packages (OIDC)
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to publish'
+        required: true
+        type: choice
+        default: 'all'
+        options:
+          - 'all'
+          - '@fivem-nui/error'
+          - '@fivem-nui/core'
+          - '@fivem-nui/svelte'
+          - '@fivem-nui/svelte-components'
+      dry_run:
+        description: 'Dry run (do not publish to npm registry)'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+      - 'npm-v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: |
+            packages/fivem-nui/error/package.json
+            packages/fivem-nui/core/package.json
+            packages/svelte/bridge/package.json
+            packages/svelte/components/package.json
+
+      - name: Install dependencies
+        run: |
+          echo "Installing dependencies for all packages..."
+          (cd packages/fivem-nui/error && npm install --legacy-peer-deps)
+          (cd packages/fivem-nui/core && npm install --legacy-peer-deps)
+          (cd packages/svelte/bridge && npm install --legacy-peer-deps)
+          (cd packages/svelte/components && npm install --legacy-peer-deps)
+
+      - name: Build packages (dependency order)
+        run: |
+          echo "Building @fivem-nui/error..."
+          (cd packages/fivem-nui/error && npm run build)
+
+          echo "Building @fivem-nui/core..."
+          (cd packages/fivem-nui/core && npm run build)
+
+          echo "Building @fivem-nui/svelte..."
+          (cd packages/svelte/bridge && npm run build)
+
+          echo "Building @fivem-nui/svelte-components..."
+          (cd packages/svelte/components && npm run build)
+
+      - name: Run verification tests
+        run: |
+          echo "Running tests before publish..."
+          (cd packages/fivem-nui/error && npm test)
+          (cd packages/fivem-nui/core && npm test)
+          (cd packages/svelte/bridge && npm test)
+          (cd packages/svelte/components && npm test)
+
+      - name: Publish to NPM via OIDC (Trusted Publishing)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          SELECTED_PKG: ${{ github.event.inputs.package || 'all' }}
+        run: |
+          PACKAGES=(
+            "packages/fivem-nui/error"
+            "packages/fivem-nui/core"
+            "packages/svelte/bridge"
+            "packages/svelte/components"
+          )
+
+          for PKG_DIR in "${PACKAGES[@]}"; do
+            PKG_NAME=$(node -p "require('./${PKG_DIR}/package.json').name")
+            PKG_VER=$(node -p "require('./${PKG_DIR}/package.json').version")
+
+            # Check if this package was selected
+            if [ "$SELECTED_PKG" != "all" ] && [ "$SELECTED_PKG" != "$PKG_NAME" ]; then
+              echo "Skipping $PKG_NAME (not selected)"
+              continue
+            fi
+
+            echo "----------------------------------------------------"
+            echo "Checking $PKG_NAME@$PKG_VER..."
+
+            # Check if this version is already published on npm
+            if npm view "${PKG_NAME}@${PKG_VER}" version > /dev/null 2>&1; then
+              echo "Package ${PKG_NAME}@${PKG_VER} is already published on npm. Skipping."
+              continue
+            fi
+
+            echo "Publishing ${PKG_NAME}@${PKG_VER}..."
+            EXTRA_FLAGS=""
+            if [ "$DRY_RUN" = "true" ]; then
+              EXTRA_FLAGS="--dry-run"
+              echo "(DRY RUN MODE ENABLED)"
+            fi
+
+            (cd "$PKG_DIR" && npm publish --provenance --access public $EXTRA_FLAGS)
+            echo "Successfully processed $PKG_NAME@$PKG_VER"
+          done

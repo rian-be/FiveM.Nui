@@ -1,0 +1,61 @@
+name: Publish NuGet Packages (OIDC)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (build and pack only, do not push to nuget.org)'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+      - 'nuget-v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Build & Publish NuGet
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore FiveM.Nui.slnx
+
+      - name: Build solution (Release)
+        run: dotnet build FiveM.Nui.slnx -c Release --no-restore
+
+      - name: Run verification tests
+        run: dotnet test FiveM.Nui.slnx -c Release --no-build --verbosity normal
+
+      - name: Pack NuGet packages
+        run: dotnet pack FiveM.Nui.slnx -c Release --no-build -o dist
+
+      - name: NuGet login (OIDC)
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: rain.be
+
+      - name: Publish to NuGet.org
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          echo "Publishing NuGet packages to nuget.org via OIDC..."
+          dotnet nuget push "dist/*.nupkg" \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --source "https://api.nuget.org/v3/index.json" \
+            --skip-duplicate
+
+          echo "Successfully processed NuGet packages."
