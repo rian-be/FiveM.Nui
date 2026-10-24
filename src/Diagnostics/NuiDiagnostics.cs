@@ -21,6 +21,8 @@ public sealed class NuiDiagnostics(NuiOptions options, INuiLogger logger) : INui
     private long _totalPayloadSize;
     private long _largestPayload;
 
+    public bool IsEnabled => options.EnableDiagnostics;
+
     /// <summary>
     /// Increments the counter named <paramref name="name"/> by one.
     /// </summary>
@@ -73,10 +75,19 @@ public sealed class NuiDiagnostics(NuiOptions options, INuiLogger logger) : INui
             return;
         }
 
+        ArgumentOutOfRangeException.ThrowIfNegative(size);
+
         Interlocked.Add(ref _totalPayloadSize, size);
-        if (size > Interlocked.Read(ref _largestPayload))
+        var currentLargest = Interlocked.Read(ref _largestPayload);
+        while (size > currentLargest)
         {
-            Interlocked.Exchange(ref _largestPayload, size);
+            var observed = Interlocked.CompareExchange(ref _largestPayload, size, currentLargest);
+            if (observed == currentLargest)
+            {
+                break;
+            }
+
+            currentLargest = observed;
         }
     }
 
