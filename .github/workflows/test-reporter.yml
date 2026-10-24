@@ -41,7 +41,7 @@ jobs:
       - name: Run .NET Tests
         continue-on-error: true
         run: |
-          dotnet test FiveM.Nui.slnx --configuration Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+          dotnet test FiveM.Nui.slnx --configuration Release --logger "trx" --results-directory TestResults
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v3
