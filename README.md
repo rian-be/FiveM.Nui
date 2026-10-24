@@ -96,10 +96,10 @@ public sealed record SpawnVehicleResponse(bool Success, string NetId);
 ```ts
 // Frontend automatically knows parameter and response types!
 const result = await nui.request('garage:spawn', { 
-  VehicleModel: 'banshee', 
-  Plate: 'OUTLAW' 
+  vehicleModel: 'banshee',
+  plate: 'OUTLAW'
 });
-console.log(result.NetId);
+console.log(result.netId);
 ```
 
 ### 2. ⚡ Zero-Lag Svelte 5 Runes
