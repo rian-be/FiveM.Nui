@@ -36,12 +36,17 @@ public sealed class NuiCallbackRegistry(INuiLogger logger) : INuiCallbackRegistr
         Func<TRequest, CancellationToken, Task<NuiResult<TResponse>>> handler,
         NuiCallbackOptions? options = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
+        ArgumentNullException.ThrowIfNull(handler);
+
         INuiCallbackHandler callbackHandler =
             new CallbackHandler<TRequest, TResponse>(handler, logger, eventName);
 
         if (options is { Serialize: true })
         {
-            var group = options.SerializationGroup ?? eventName;
+            var group = string.IsNullOrWhiteSpace(options.SerializationGroup)
+                ? eventName
+                : options.SerializationGroup;
             var gate = _gates.GetOrAdd(group, _ => new SemaphoreSlim(1, 1));
             callbackHandler = new SerializedCallbackHandler(callbackHandler, gate);
         }
@@ -61,6 +66,7 @@ public sealed class NuiCallbackRegistry(INuiLogger logger) : INuiCallbackRegistr
     /// <returns><see langword="true"/> if a handler was removed; otherwise <see langword="false"/>.</returns>
     public bool Unregister(string eventName)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
         var removed = _handlers.TryRemove(eventName, out _);
 
         if (removed)
@@ -81,6 +87,7 @@ public sealed class NuiCallbackRegistry(INuiLogger logger) : INuiCallbackRegistr
     /// </summary>
     public INuiCallbackHandler? UnregisterAndGetHandler(string eventName)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
         if (_handlers.TryRemove(eventName, out var handler))
         {
             logger.LogInformation("Unregistered callback '{Event}'", eventName);
@@ -98,6 +105,7 @@ public sealed class NuiCallbackRegistry(INuiLogger logger) : INuiCallbackRegistr
     /// <returns>The registered handler, or <see langword="null"/> when none is registered.</returns>
     public INuiCallbackHandler? GetHandler(string eventName)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
         _handlers.TryGetValue(eventName, out var handler);
         return handler;
     }

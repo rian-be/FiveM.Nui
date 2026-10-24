@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="FiveM.Nui.Tests" />
     <None Include="buildTransitive\FiveM.Nui.targets" Pack="true" PackagePath="buildTransitive\" />
   </ItemGroup>
 

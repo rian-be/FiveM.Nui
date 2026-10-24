@@ -9,11 +9,33 @@ namespace FiveM.Nui.Hosting;
 public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoordinator
 {
     private readonly ConcurrentDictionary<string, PendingRequestInfo> _pendingRequests = new();
+    private long _nextAutomaticCleanup;
 
-    private sealed class PendingRequestInfo(TaskCompletionSource<string> tcs)
+    private abstract class PendingRequestInfo
     {
-        public readonly TaskCompletionSource<string> Tcs = tcs;
-        public readonly DateTimeOffset RegisteredAt = DateTimeOffset.UtcNow;
+        public readonly long RegisteredAt = Environment.TickCount64;
+
+        public abstract void Complete(NuiMessage message, INuiSerializer serializer);
+        public abstract void Fail(Exception exception);
+        public abstract void Cancel();
+    }
+
+    private sealed class JsonPendingRequest(TaskCompletionSource<string> completion) : PendingRequestInfo
+    {
+        public override void Complete(NuiMessage message, INuiSerializer serializer) =>
+            completion.TrySetResult(message.Payload is null ? "null" : serializer.Serialize(message.Payload));
+
+        public override void Fail(Exception exception) => completion.TrySetException(exception);
+        public override void Cancel() => completion.TrySetCanceled();
+    }
+
+    private sealed class TypedPendingRequest<T>(TaskCompletionSource<T> completion) : PendingRequestInfo
+    {
+        public override void Complete(NuiMessage message, INuiSerializer serializer) =>
+            completion.TrySetResult(serializer.Deserialize<T>(message.Payload)!);
+
+        public override void Fail(Exception exception) => completion.TrySetException(exception);
+        public override void Cancel() => completion.TrySetCanceled();
     }
 
     /// <summary>
@@ -23,14 +45,35 @@ public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoo
     /// <param name="tcs">Completion source completed when the response arrives.</param>
     public void RegisterPendingRequest(string correlationId, TaskCompletionSource<string> tcs)
     {
-        if (!_pendingRequests.TryAdd(correlationId, new PendingRequestInfo(tcs)))
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        ArgumentNullException.ThrowIfNull(tcs);
+
+        RegisterPendingRequest(correlationId, new JsonPendingRequest(tcs));
+    }
+
+    /// <summary>
+    /// Registers a typed completion for the built-in client path. The response
+    /// payload can then be read directly from its JsonElement without creating
+    /// an intermediate JSON string.
+    /// </summary>
+    internal void RegisterPendingRequest<T>(string correlationId, TaskCompletionSource<T> tcs)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        ArgumentNullException.ThrowIfNull(tcs);
+        RegisterPendingRequest(correlationId, new TypedPendingRequest<T>(tcs));
+    }
+
+    private void RegisterPendingRequest(string correlationId, PendingRequestInfo request)
+    {
+        if (!_pendingRequests.TryAdd(correlationId, request))
         {
-            logger.LogWarning("Duplicate correlation ID registered: {CorrelationId}", correlationId);
-            return;
+            throw new InvalidOperationException(
+                $"A pending request with correlation ID '{correlationId}' is already registered.");
         }
 
-        logger.LogDebug("Registered pending request {CorrelationId} (pending={Count})",
-            correlationId, _pendingRequests.Count);
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+            logger.LogDebug("Registered pending request {CorrelationId} (pending={Count})",
+                correlationId, _pendingRequests.Count);
     }
 
     /// <summary>
@@ -39,10 +82,12 @@ public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoo
     /// <param name="correlationId">Correlation id of the request to remove.</param>
     public void UnregisterPendingRequest(string correlationId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
         if (_pendingRequests.TryRemove(correlationId, out var info))
         {
-            logger.LogDebug("Unregistered pending request {CorrelationId} (pending={Count})",
-                correlationId, _pendingRequests.Count);
+            if (logger.IsEnabled(NuiLogLevel.Debug))
+                logger.LogDebug("Unregistered pending request {CorrelationId} (pending={Count})",
+                    correlationId, _pendingRequests.Count);
         }
     }
 
@@ -54,30 +99,32 @@ public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoo
     /// <param name="serializer">Serializer used to read the response payload.</param>
     public void CompleteRequest(string correlationId, NuiMessage message, INuiSerializer serializer)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(serializer);
+
         if (_pendingRequests.TryRemove(correlationId, out var info))
         {
             try
             {
                 if (message.Success)
                 {
-                    logger.LogDebug("Completing {CorrelationId} successfully", correlationId);
-                    var json = message.Payload is null
-                        ? "null"
-                        : serializer.Serialize(message.Payload);
-                    info.Tcs.TrySetResult(json);
+                    if (logger.IsEnabled(NuiLogLevel.Debug))
+                        logger.LogDebug("Completing {CorrelationId} successfully", correlationId);
+                    info.Complete(message, serializer);
                 }
                 else
                 {
                     var error = message.Error ?? new NuiError("UNKNOWN_ERROR", "Unknown error");
                     logger.LogWarning("Completing {CorrelationId} with failure: {Code} - {Message}",
                         correlationId, error.Code, error.Message);
-                    info.Tcs.TrySetException(new NuiException(error.Code, error.Message));
+                    info.Fail(new NuiException(error.Code, error.Message));
                 }
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error completing request: {CorrelationId}", correlationId);
-                info.Tcs.TrySetException(ex);
+                info.Fail(ex);
             }
         }
         else
@@ -91,10 +138,9 @@ public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoo
     /// Returns the count of removed entries.
     /// </summary>
     /// <remarks>
-    /// This is a lazy cleanup mechanism: expired entries are only removed when
-    /// <see cref="RegisterPendingRequest"/> calls <c>CleanupExpired</c> before
-    /// registering a new pending request. If no new requests arrive, expired
-    /// entries will remain until the client is disposed.
+    /// This is a lazy cleanup mechanism: the client requests cleanup before
+    /// registering new pending work. If no new requests arrive, expired entries
+    /// remain until the coordinator is disposed.
     ///
     /// Cleanup removes expired entries from tracking without canceling their
     /// TaskCompletionSources. This allows individual request timeouts (set via
@@ -121,35 +167,54 @@ public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoo
             return 0;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        var cutoff = now - timeout;
+        var now = Environment.TickCount64;
+        var timeoutMilliseconds = (long)Math.Min(timeout.TotalMilliseconds, long.MaxValue);
         var removed = 0;
 
         foreach (var kvp in _pendingRequests)
         {
-            if (kvp.Value.RegisteredAt < cutoff)
-            {
-                if (_pendingRequests.TryRemove(kvp.Key, out var info))
-                {
-                    // Log warning for expired but not-yet-canceled requests
-                    // Do NOT call TrySetCanceled() here - let the request's own
-                    // timeout (from RequestAsync's CancelAfter) handle cancellation.
-                    // We just clean up the stale dictionary entry to prevent memory leaks.
-                    logger.LogWarning(
-                        "Expired pending request {CorrelationId} (registered at {RegisteredAt}, age={Age}) was not cleaned up by its owner",
-                        kvp.Key, info.RegisteredAt, now - info.RegisteredAt);
-                    removed++;
-                }
-            }
+            var ageMilliseconds = now - kvp.Value.RegisteredAt;
+            if (ageMilliseconds <= timeoutMilliseconds) continue;
+            if (!_pendingRequests.TryRemove(kvp.Key, out _)) continue;
+            
+            // Log warning for expired but not-yet-canceled requests
+            // Do NOT call TrySetCanceled() here - let the request's own
+            // timeout (from RequestAsync's CancelAfter) handle cancellation.
+            // We just clean up the stale dictionary entry to prevent memory leaks.
+            logger.LogWarning(
+                "Expired pending request {CorrelationId} (age={Age}) was not cleaned up by its owner",
+                kvp.Key, TimeSpan.FromMilliseconds(ageMilliseconds));
+            removed++;
         }
 
-        if (removed > 0)
-        {
+        if (removed <= 0) return removed;
+        if (logger.IsEnabled(NuiLogLevel.Debug))
             logger.LogDebug("Cleaned up {Count} expired pending request(s), {Remaining} remaining",
                 removed, _pendingRequests.Count);
-        }
 
         return removed;
+    }
+
+    /// <summary>
+    /// Runs the client's opportunistic cleanup at most once every 30 seconds.
+    /// Individual requests unregister themselves, so scanning the dictionary on
+    /// every healthy request only adds contention and cannot find useful work.
+    /// </summary>
+    internal int CleanupExpiredIfDue(TimeSpan timeout)
+    {
+        if (timeout <= TimeSpan.Zero)
+            return 0;
+
+        var now = Environment.TickCount64;
+        var next = Volatile.Read(ref _nextAutomaticCleanup);
+        if (now < next)
+            return 0;
+
+        var interval = Math.Min(timeout.TotalMilliseconds, 30_000d);
+        var scheduled = now + Math.Max(1L, (long)interval);
+        return Interlocked.CompareExchange(ref _nextAutomaticCleanup, scheduled, next) != next
+            ? 0
+            : CleanupExpired(timeout);
     }
 
     /// <summary>
@@ -162,11 +227,12 @@ public sealed class ConcurrentRequestManager(INuiLogger logger) : INuiRequestCoo
     /// </remarks>
     public ValueTask DisposeAsync()
     {
-        logger.LogDebug("Canceling {Count} pending request(s) on dispose", _pendingRequests.Count);
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+            logger.LogDebug("Canceling {Count} pending request(s) on dispose", _pendingRequests.Count);
 
         foreach (var (_, info) in _pendingRequests)
         {
-            info.Tcs.TrySetCanceled();
+            info.Cancel();
         }
         _pendingRequests.Clear();
         return ValueTask.CompletedTask;

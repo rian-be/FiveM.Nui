@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
-using FiveM.Nui.Common;
 
 namespace FiveM.Nui.Hosting;
 
@@ -9,7 +7,8 @@ namespace FiveM.Nui.Hosting;
 /// </summary>
 public sealed class EventManager(INuiLogger logger) : INuiEventBus
 {
-    private readonly ConcurrentDictionary<string, ConcurrentBag<Subscription>> _subscribers = new();
+    private readonly Dictionary<string, Subscription[]> _subscribers = new();
+    private readonly Lock _gate = new();
 
     /// <summary>
     /// Registers <paramref name="handler"/> for <paramref name="eventName"/> and
@@ -25,31 +24,27 @@ public sealed class EventManager(INuiLogger logger) : INuiEventBus
     /// </returns>
     public IDisposable Subscribe<T>(string eventName, Action<T> handler)
     {
-        var subscription = new Subscription(typeof(T), handler);
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
+        ArgumentNullException.ThrowIfNull(handler);
+        var subscription = new Subscription<T>(handler);
 
-        var bag = _subscribers.GetOrAdd(eventName, _ => []);
-        bag.Add(subscription);
-
-        logger.LogDebug("Subscribed to '{Event}' as {Payload} (subscribers={Count})",
-            eventName, typeof(T).Name, bag.Count);
-
-        return new DisposableAction(() =>
+        int count;
+        lock (_gate)
         {
-            if (!_subscribers.TryGetValue(eventName, out var handlers)) return;
-           
-            var newBag = new ConcurrentBag<Subscription>();
-            foreach (var existing in handlers)
-            {
-                if (!ReferenceEquals(existing, subscription))
-                {
-                    newBag.Add(existing);
-                }
-            }
-            _subscribers.TryUpdate(eventName, newBag, handlers);
+            _subscribers.TryGetValue(eventName, out var handlers);
+            handlers ??= [];
+            var updated = new Subscription[handlers.Length + 1];
+            handlers.CopyTo(updated, 0);
+            updated[^1] = subscription;
+            _subscribers[eventName] = updated;
+            count = updated.Length;
+        }
 
-            logger.LogDebug("Unsubscribed from '{Event}' (subscribers={Count})",
-                eventName, newBag.Count);
-        });
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+            logger.LogDebug("Subscribed to '{Event}' as {Payload} (subscribers={Count})",
+                eventName, typeof(T).Name, count);
+
+        return new SubscriptionHandle(this, eventName, subscription);
     }
 
     /// <summary>
@@ -64,13 +59,22 @@ public sealed class EventManager(INuiLogger logger) : INuiEventBus
     /// </remarks>
     public void Publish(string eventName, string payloadJson, INuiSerializer serializer)
     {
-        if (!_subscribers.TryGetValue(eventName, out var handlers))
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
+        ArgumentNullException.ThrowIfNull(payloadJson);
+        ArgumentNullException.ThrowIfNull(serializer);
+
+        Subscription[] handlers;
+        lock (_gate)
+            handlers = _subscribers.TryGetValue(eventName, out var current) ? current : [];
+        if (handlers.Length == 0)
         {
-            logger.LogDebug("No subscribers for '{Event}'; dropping payload", eventName);
+            if (logger.IsEnabled(NuiLogLevel.Debug))
+                logger.LogDebug("No subscribers for '{Event}'; dropping payload", eventName);
             return;
         }
 
-        logger.LogDebug("Publishing '{Event}' to {Count} subscriber(s)", eventName, handlers.Count);
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+            logger.LogDebug("Publishing '{Event}' to {Count} subscriber(s)", eventName, handlers.Length);
 
         foreach (var subscription in handlers)
         {
@@ -86,7 +90,7 @@ public sealed class EventManager(INuiLogger logger) : INuiEventBus
                     continue;
                 }
 
-                subscription.Handler.DynamicInvoke(payload);
+                subscription.Invoke(payload);
             }
             catch (JsonException ex)
             {
@@ -100,5 +104,58 @@ public sealed class EventManager(INuiLogger logger) : INuiEventBus
         }
     }
 
-    private sealed record Subscription(Type PayloadType, Delegate Handler);
+    private void Unsubscribe(string eventName, Subscription subscription)
+    {
+        int count;
+        lock (_gate)
+        {
+            if (!_subscribers.TryGetValue(eventName, out var handlers))
+                return;
+
+            var index = Array.IndexOf(handlers, subscription);
+            if (index < 0)
+                return;
+
+            count = handlers.Length - 1;
+            if (count == 0)
+            {
+                _subscribers.Remove(eventName);
+            }
+            else
+            {
+                var updated = new Subscription[count];
+                if (index > 0)
+                    Array.Copy(handlers, 0, updated, 0, index);
+                if (index < count)
+                    Array.Copy(handlers, index + 1, updated, index, count - index);
+                _subscribers[eventName] = updated;
+            }
+        }
+
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+            logger.LogDebug("Unsubscribed from '{Event}' (subscribers={Count})", eventName, count);
+    }
+
+    private abstract class Subscription
+    {
+        public abstract Type PayloadType { get; }
+        public abstract void Invoke(object payload);
+    }
+
+    private sealed class Subscription<T>(Action<T> handler) : Subscription
+    {
+        public override Type PayloadType => typeof(T);
+        public override void Invoke(object payload) => handler((T)payload);
+    }
+
+    private sealed class SubscriptionHandle(
+        EventManager owner,
+        string eventName,
+        Subscription subscription) : IDisposable
+    {
+        private EventManager? _owner = owner;
+
+        public void Dispose() =>
+            Interlocked.Exchange(ref _owner, null)?.Unsubscribe(eventName, subscription);
+    }
 }

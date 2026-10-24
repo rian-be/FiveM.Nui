@@ -38,6 +38,14 @@ public sealed class FiveMNuiLogger(string category = "[FiveM.Nui]") : INuiLogger
     /// <summary>Whether <see cref="LogInformation"/> reaches the console.</summary>
     public bool IncludeInformation { get; set; } = true;
 
+    /// <inheritdoc />
+    public bool IsEnabled(NuiLogLevel level) => level switch
+    {
+        NuiLogLevel.Debug => IncludeDebug,
+        NuiLogLevel.Information => IncludeInformation,
+        _ => true
+    };
+
     /// <summary>
     /// Writes a debug entry, but only when <see cref="IncludeDebug"/> is enabled.
     /// </summary>
