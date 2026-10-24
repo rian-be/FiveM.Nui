@@ -78,14 +78,14 @@ public class NuiGateway : NuiClient
     {
         RegisterCallback(EnvelopeCallback, ReceiveFromNui);
 
-        RegisterCallback("ready", _ => Run(() =>
+        RegisterCallbackAsync("ready", _ =>
         {
             MarkNuiReady();
             return onReady?.Invoke() ?? Task.CompletedTask;
-        }));
+        });
 
         var closeHandler = onClose ?? (() => HideAsync(Window));
-        RegisterCallback("close", _ => Run(closeHandler));
+        RegisterCallbackAsync("close", _ => closeHandler());
     }
 
     /// <summary>
@@ -114,6 +114,10 @@ public class NuiGateway : NuiClient
     /// <param name="handler">The handler receiving the raw request body.</param>
     public static void RegisterCallback(string callback, Action<string> handler) =>
         NuiCallbackBridge.Register(callback, handler);
+
+    /// <summary>Registers a raw callback that responds after its handler completes.</summary>
+    public static void RegisterCallbackAsync(string callback, Func<string, Task> handler) =>
+        NuiCallbackBridge.RegisterAsync(callback, handler);
 
     /// <summary>
     /// Runs a handler without blocking the command loop. Failures are logged
