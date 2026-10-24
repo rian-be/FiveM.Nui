@@ -21,6 +21,9 @@ public partial class NuiClient
         Func<TRequest, CancellationToken, Task<NuiResult<TResponse>>> handler,
         NuiCallbackOptions? options = null)
     {
+        ThrowIfDisposed();
+        ValidateEventName(eventName);
+        ArgumentNullException.ThrowIfNull(handler);
         _logger.LogDebug("Registering callback '{Event}' as {Request} -> {Response}",
             eventName, typeof(TRequest).Name, typeof(TResponse).Name);
 
@@ -32,7 +35,12 @@ public partial class NuiClient
     /// </summary>
     /// <param name="eventName">The callback event name to remove.</param>
     /// <returns><see langword="true"/> if a callback was removed; otherwise <see langword="false"/>.</returns>
-    public bool UnregisterCallback(string eventName) => _callbackRegistry.Unregister(eventName);
+    public bool UnregisterCallback(string eventName)
+    {
+        ThrowIfDisposed();
+        ValidateEventName(eventName);
+        return _callbackRegistry.Unregister(eventName);
+    }
 
     /// <summary>
     /// Subscribes to events forwarded from the NUI page.
@@ -43,6 +51,9 @@ public partial class NuiClient
     /// <returns>An <see cref="IDisposable"/> that unsubscribes the handler.</returns>
     public IDisposable Subscribe<T>(string eventName, Action<T> handler)
     {
+        ThrowIfDisposed();
+        ValidateEventName(eventName);
+        ArgumentNullException.ThrowIfNull(handler);
         _logger.LogDebug("Subscribing to '{Event}' as {Payload}", eventName, typeof(T).Name);
         return _eventManager.Subscribe(eventName, handler);
     }
