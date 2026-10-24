@@ -63,4 +63,21 @@ public class EventManagerTests
         Assert.True(event1Called);
         Assert.False(event2Called);
     }
+
+    [Fact]
+    public async Task ConcurrentSubscribeAndDispose_ShouldNotLoseNewListener()
+    {
+        for (var iteration = 0; iteration < 500; iteration++)
+        {
+            var manager = new EventManager(NullNuiLogger.Instance);
+            var old = manager.Subscribe<string>("race", _ => { });
+            var called = false;
+            await Task.WhenAll(
+                Task.Run(old.Dispose),
+                Task.Run(() => manager.Subscribe<string>("race", _ => called = true)));
+
+            manager.Publish("race", "\"value\"", _serializer);
+            Assert.True(called);
+        }
+    }
 }
