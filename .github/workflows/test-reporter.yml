@@ -43,6 +43,11 @@ jobs:
         run: |
           dotnet test FiveM.Nui.slnx --configuration Release --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
+      - name: Smoke-test benchmark selection and runtime
+        run: |
+          dotnet run --project tests/FiveM.Nui.Benchmarks/FiveM.Nui.Benchmarks.csproj --configuration Release -- --filter "*MessagingBenchmarks.SendAsync_Event" --job dry | tee benchmark-smoke.log
+          grep -E "SendAsync_Event.*[0-9].*(ns|us|ms|s)" benchmark-smoke.log
+
       - name: Publish Test Report
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
@@ -73,6 +78,8 @@ jobs:
             dir: "packages/fivem-nui/core"
           - name: "@fivem-nui/svelte"
             dir: "packages/svelte/bridge"
+          - name: "@fivem-nui/svelte-components"
+            dir: "packages/svelte/components"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,14 +93,19 @@ jobs:
             packages/fivem-nui/error/package.json
             packages/fivem-nui/core/package.json
             packages/svelte/bridge/package.json
+            packages/svelte/components/package.json
 
       - name: Build local dependencies
-        if: matrix.name == '@fivem-nui/svelte'
+        if: matrix.name == '@fivem-nui/svelte' || matrix.name == '@fivem-nui/svelte-components'
         run: |
           npm --prefix packages/fivem-nui/error install --legacy-peer-deps
           npm --prefix packages/fivem-nui/error run build
           npm --prefix packages/fivem-nui/core install --legacy-peer-deps
           npm --prefix packages/fivem-nui/core run build
+          if [ "${{ matrix.name }}" = "@fivem-nui/svelte-components" ]; then
+            npm --prefix packages/svelte/bridge install --legacy-peer-deps
+            npm --prefix packages/svelte/bridge run build
+          fi
 
       - name: Install dependencies
         working-directory: ${{ matrix.dir }}
@@ -103,6 +115,34 @@ jobs:
         working-directory: ${{ matrix.dir }}
         continue-on-error: true
         run: npx vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=junit.xml
+
+      - name: Build and type-check package
+        working-directory: ${{ matrix.dir }}
+        run: |
+          npm run build
+          npm run check
+
+      - name: Smoke-test native Node ESM entrypoint
+        if: matrix.name != '@fivem-nui/svelte-components'
+        working-directory: ${{ matrix.dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pack_dir="$RUNNER_TEMP/fivem-nui-esm-${{ strategy.job-index }}"
+          mkdir -p "$pack_dir"
+
+          if [ "${{ matrix.name }}" = "@fivem-nui/core" ]; then
+            npm pack ../error --pack-destination "$pack_dir"
+            npm install --no-save "$pack_dir"/fivem-nui-error-*.tgz
+            node -e "Promise.all([import('./dist/index.js'), import('./dist/testing/index.js'), import('./dist/diagnostics/index.js')])"
+          elif [ "${{ matrix.name }}" = "@fivem-nui/svelte" ]; then
+            npm pack ../../fivem-nui/error --pack-destination "$pack_dir"
+            npm pack ../../fivem-nui/core --pack-destination "$pack_dir"
+            npm install --no-save "$pack_dir"/fivem-nui-error-*.tgz "$pack_dir"/fivem-nui-core-*.tgz
+            node -e "Promise.all([import('./dist/index.js'), import('./dist/mock/index.js'), import('./dist/actions/index.js')])"
+          else
+            node -e "import('./dist/index.js')"
+          fi
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v3
