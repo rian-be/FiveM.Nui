@@ -26,6 +26,9 @@ public interface INuiDiagnosticsCollector : INuiDiagnosticsProvider
     /// </summary>
     void RecordPayload(int size);
 
+    /// <summary>Appends an operation to the bounded diagnostics timeline.</summary>
+    void RecordOperation(NuiDiagnosticOperation operation) { }
+
     /// <summary>
     /// Resets all collected metrics to zero.
     /// </summary>
