@@ -58,12 +58,18 @@ export class MessageTransport {
     const deadline = setTimeout(() => controller.abort(), this.postTimeoutMs);
 
     try {
-      await this.fetchImpl(url, {
+      const response = await this.fetchImpl(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=UTF-8' },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+      if (!response.ok) {
+        throw new NuiRequestError(
+          NuiErrorCodes.Transport,
+          `POST ${url} failed with HTTP ${response.status}`,
+        );
+      }
     } catch (error) {
       // A timeout abort surfaces as an error whose `name` is 'AbortError'.
       // In browsers that is a DOMException, but some fetch polyfills throw a
@@ -80,6 +86,7 @@ export class MessageTransport {
         );
       }
 
+      if (error instanceof NuiRequestError) throw error;
       throw new NuiRequestError(NuiErrorCodes.Transport, String(error));
     } finally {
       clearTimeout(deadline);

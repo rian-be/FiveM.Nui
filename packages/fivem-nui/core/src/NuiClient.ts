@@ -35,15 +35,15 @@ const WINDOW_ACTIONS: ReadonlySet<string> = new Set<NuiWindowAction>([
 type WindowHandler = (action: NuiWindowAction, window: string | undefined) => void;
 
 /**
- * `NuiClient` is **thin façade** it composes four collaborators and
+ * `NuiClient` is **thin faĂ§ade** it composes four collaborators and
  * orchestrates their interaction:
  *
  * | Collaborator           | Responsibility                         |
  * |------------------------|----------------------------------------|
  * | `MessageTransport`     | Raw HTTP POST to `https://<res>/<cb>`  |
- * | `RequestCoordinator`   | Correlation ID ↔ Promise resolution    |
+ * | `RequestCoordinator`   | Correlation ID â†” Promise resolution    |
  * | `CallbackRegistry`     | C#-request handler lookup              |
- * | `EventBus`             | C#→UI event subscription / dispatch    |
+ * | `EventBus`             | C#â†’UI event subscription / dispatch    |
  *
  * Window lifecycle listeners (`onWindow`) and the browser `message`
  * listener (`listen`) stay here because they are browser-integration glue.
@@ -94,7 +94,7 @@ export class NuiClient {
 
     this.logger.debug('NuiClient initialized', { resource, callbackName, postTimeoutMs });
   }
-  
+
   /**
    * Sends a one way message to C#.
    *
@@ -277,7 +277,7 @@ export class NuiClient {
       throw error;
     }
   }
-  
+
   // Callback server (C# → UI requests)
   /**
    * Registers a callback handler for C# requests.
@@ -339,7 +339,7 @@ export class NuiClient {
   unregisterCallback(eventName: string): boolean {
     return this.callbackRegistry.unregister(eventName);
   }
-  
+
   /**
    * Subscribes to C# events.
    *
@@ -349,7 +349,7 @@ export class NuiClient {
   on<T>(eventName: keyof NuiEventMap extends never ? string : never, handler: (data: T) => void): () => void;
   on(eventName: string, handler: (data: unknown) => void): () => void {
     if (this.disposed) {
-      return () => {};
+      return () => { };
     }
 
     return this.eventBus.on(eventName, handler);
@@ -362,7 +362,7 @@ export class NuiClient {
   once<T>(eventName: keyof NuiEventMap extends never ? string : never, handler: (data: T) => void): () => void;
   once(eventName: string, handler: (data: unknown) => void): () => void {
     if (this.disposed) {
-      return () => {};
+      return () => { };
     }
 
     return this.eventBus.once(eventName, handler);
@@ -374,7 +374,7 @@ export class NuiClient {
   off(eventName: string, handler?: EventHandler): void {
     this.eventBus.off(eventName, handler);
   }
-  
+
   /**
    * Subscribes to window lifecycle envelopes from C#.
    *
@@ -383,7 +383,7 @@ export class NuiClient {
    */
   onWindow(handler: WindowHandler): () => void {
     if (this.disposed) {
-      return () => {};
+      return () => { };
     }
 
     this.windowListeners.add(handler);
@@ -392,7 +392,7 @@ export class NuiClient {
       this.windowListeners.delete(handler);
     };
   }
-  
+
   /**
    * Routes an incoming message from C#. Pass `MessageEvent.data` here;
    * `listen()` does that for you.
@@ -430,7 +430,7 @@ export class NuiClient {
    */
   listen(target: Window = window): () => void {
     if (this.listening) {
-      return () => {};
+      return () => { };
     }
 
     this.listening = true;
@@ -451,15 +451,19 @@ export class NuiClient {
 
     target.addEventListener('message', listener as EventListener);
 
-    this.stopListening = () => {
+    let stopped = false;
+    const stop = () => {
+      if (stopped) return;
+      stopped = true;
       target.removeEventListener('message', listener as EventListener);
-      this.listening = false;
-      this.stopListening = null;
+      if (this.stopListening === stop) {
+        this.listening = false;
+        this.stopListening = null;
+      }
     };
+    this.stopListening = stop;
 
-    return () => {
-      this.stopListening?.();
-    };
+    return stop;
   }
 
   /** Handles incoming requests from C#. */
@@ -556,7 +560,7 @@ export class NuiClient {
       }
     }
   }
-  
+
   /**
    * POSTs an envelope to the main callback, incrementing the `sent` counter.
    * Reused by `send`, `sendAndWait` and `request`.
@@ -575,7 +579,7 @@ export class NuiClient {
       this.logger.warn('Could not deliver response', error);
     }
   }
-  
+
   /** Current counters. Cheap enough to call from a diagnostics panel. */
   getDiagnostics(): NuiDiagnostics {
     return {
