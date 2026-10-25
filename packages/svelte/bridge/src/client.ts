@@ -78,7 +78,7 @@ export class SvelteNuiClient {
     this._typedClient = options.client ?? new CoreNuiClient(options);
     this._client = this._typedClient as unknown as UntypedNuiClient;
 
-    if (options.autoInitialize !== false) {
+    if (options.autoInitialize !== false && typeof window !== 'undefined') {
       this.listen();
     }
 
@@ -107,7 +107,7 @@ export class SvelteNuiClient {
    * @returns Unsubscribe function to remove the event listener.
    */
   on<K extends NuiEventKey>(eventName: K, handler: (data: NuiEventPayload<K>) => void): () => void;
-  on<T = unknown>(eventName: string, handler: (data: T) => void): () => void;
+  on<T = unknown>(eventName: keyof import('@fivem-nui/core').NuiEventMap extends never ? string : never, handler: (data: T) => void): () => void;
   on(eventName: string, handler: (data: any) => void): () => void {
     this._ensureListening();
     const unsub = this._client.on(eventName, handler);
@@ -126,7 +126,7 @@ export class SvelteNuiClient {
    * @returns Unsubscribe function to remove the one-time listener prior to firing.
    */
   once<K extends NuiEventKey>(eventName: K, handler: (data: NuiEventPayload<K>) => void): () => void;
-  once<T = unknown>(eventName: string, handler: (data: T) => void): () => void;
+  once<T = unknown>(eventName: keyof import('@fivem-nui/core').NuiEventMap extends never ? string : never, handler: (data: T) => void): () => void;
   once(eventName: string, handler: (data: any) => void): () => void {
     this._ensureListening();
     let unsub: () => void;
@@ -161,7 +161,7 @@ export class SvelteNuiClient {
    * @param payload - Optional data payload to transmit.
    */
   send<K extends NuiEventKey>(eventName: K, payload?: SendPayload<K>): void;
-  send(eventName: string, payload?: unknown): void;
+  send(eventName: keyof import('@fivem-nui/core').NuiEventMap extends never ? string : never, payload?: unknown): void;
   send(eventName: string, payload?: unknown): void {
     this._ensureListening();
     this._client.send(eventName, payload);
@@ -175,7 +175,7 @@ export class SvelteNuiClient {
    * @returns Promise that resolves once the transport layer confirms transmission.
    */
   async sendAndWait<K extends NuiEventKey>(eventName: K, payload?: SendPayload<K>): Promise<void>;
-  async sendAndWait(eventName: string, payload?: unknown): Promise<void>;
+  async sendAndWait(eventName: keyof import('@fivem-nui/core').NuiEventMap extends never ? string : never, payload?: unknown): Promise<void>;
   async sendAndWait(eventName: string, payload?: unknown): Promise<void> {
     this._ensureListening();
     await this._client.sendAndWait(eventName, payload);
@@ -199,7 +199,7 @@ export class SvelteNuiClient {
     signal?: AbortSignal
   ): Promise<NuiEventResponse<K>>;
   request<TRequest = unknown, TResponse = unknown>(
-    eventName: string,
+    eventName: keyof import('@fivem-nui/core').NuiEventMap extends never ? string : never,
     request?: TRequest,
     timeout?: number,
     signal?: AbortSignal
