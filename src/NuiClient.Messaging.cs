@@ -37,14 +37,11 @@ public partial class NuiClient
         var json = _serializer.Serialize(message);
 
         var size = GetPayloadSize(json, eventName);
-        _diagnostics.IncrementCounter("messages_sent");
-        _diagnostics.RecordPayload(size);
-
         if (_logger.IsEnabled(NuiLogLevel.Debug))
             _logger.LogDebug("-> EVENT '{Event}' ({Bytes} bytes)", eventName, size);
         LogPayload("->", message);
 
-        return SendPreparedAsync(message, json, cancellationToken);
+        return SendPreparedAsync(message, json, size, cancellationToken);
     }
 
     /// <summary>
@@ -83,7 +80,7 @@ public partial class NuiClient
         var message = NuiMessage.CreateRequest(correlationId, eventName, request);
 
         var json = _serializer.Serialize(message);
-        GetPayloadSize(json, eventName);
+        var size = GetPayloadSize(json, eventName);
 
         // RunContinuationsAsynchronously keeps the awaiting caller (and its
         // continuation) off the transport/inbound thread that completes the
@@ -120,7 +117,7 @@ public partial class NuiClient
 
         try
         {
-            await SendPreparedAsync(message, json, linkedCts.Token);
+            await SendPreparedAsync(message, json, size, linkedCts.Token);
 
             TResponse response;
             if (typedCompletion is not null)
@@ -136,6 +133,7 @@ public partial class NuiClient
 
             _diagnostics.RecordTiming($"request:{eventName}", elapsed);
             _diagnostics.IncrementCounter("requests_completed");
+            RecordRequestOperation(eventName, correlationId, size, elapsed, "completed");
             if (_logger.IsEnabled(NuiLogLevel.Debug))
                 _logger.LogDebug("<- RESPONSE for '{Event}' id={CorrelationId} in {Elapsed}ms",
                     eventName, correlationId, elapsed);
@@ -145,6 +143,7 @@ public partial class NuiClient
         catch (OperationCanceledException) when (clientToken.IsCancellationRequested)
         {
             _diagnostics.IncrementCounter("requests_cancelled");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "cancelled");
             _logger.LogWarning("Request '{Event}' id={CorrelationId} canceled (client disposed)",
                 eventName, correlationId);
             throw;
@@ -155,6 +154,7 @@ public partial class NuiClient
             // deadline. Reporting it as a timeout would poison the timeout
             // counter and mislead diagnosis.
             _diagnostics.IncrementCounter("requests_cancelled");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "cancelled");
             _logger.LogWarning("Request '{Event}' id={CorrelationId} canceled by caller",
                 eventName, correlationId);
             throw;
@@ -162,6 +162,7 @@ public partial class NuiClient
         catch (OperationCanceledException)
         {
             _diagnostics.IncrementCounter("requests_timeout");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "timeout", "TIMEOUT");
             _logger.LogError("Request '{Event}' id={CorrelationId} timed out after {Timeout}s",
                 eventName, correlationId, timeout.TotalSeconds);
             throw;
@@ -169,6 +170,8 @@ public partial class NuiClient
         catch (Exception ex)
         {
             _diagnostics.IncrementCounter("requests_failed");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "failed",
+                ex is NuiException nuiException ? nuiException.ErrorCode : ex.GetType().Name);
             _logger.LogError(ex, "Request '{Event}' id={CorrelationId} failed",
                 eventName, correlationId);
             throw;
@@ -193,7 +196,6 @@ public partial class NuiClient
         var json = _serializer.Serialize(message);
         var size = GetPayloadSize(json, eventName);
         _diagnostics.IncrementCounter("events_published");
-        _diagnostics.RecordPayload(size);
         if (_logger.IsEnabled(NuiLogLevel.Debug))
             _logger.LogDebug("-> PUBLISH '{Event}'", eventName);
         LogPayload("->", message);
@@ -202,7 +204,7 @@ public partial class NuiClient
         var diagnostics = _diagnostics;
         try
         {
-            var send = SendPreparedAsync(message, json, _cts.Token);
+            var send = SendPreparedAsync(message, json, size, _cts.Token);
             if (!send.IsCompletedSuccessfully)
             {
                 _ = ObservePublishAsync(send, eventName, logger, diagnostics);
@@ -239,10 +241,75 @@ public partial class NuiClient
     private Task SendPreparedAsync(
         NuiMessage message,
         string json,
-        CancellationToken cancellationToken) =>
-        _transport is FiveM.Nui.Transport.FiveMNuiTransport transport
+        int size,
+        CancellationToken cancellationToken)
+    {
+        _diagnostics.IncrementCounter("messages_sent");
+        _diagnostics.RecordPayload(size);
+        _diagnostics.RecordOperation(new NuiDiagnosticOperation(
+            0,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            "outbound",
+            message.Type,
+            message.Event,
+            size,
+            null,
+            "sent",
+            message.Id));
+
+        var startedAt = Environment.TickCount64;
+        var send = _transport is FiveM.Nui.Transport.FiveMNuiTransport transport
             ? transport.SendSerializedAsync(message, json, cancellationToken)
             : _transport.SendAsync(message, cancellationToken);
+
+        if (!_diagnostics.IsEnabled)
+        {
+            return send;
+        }
+
+        if (send.IsCompletedSuccessfully)
+        {
+            _diagnostics.RecordTiming($"send:{message.Event}", Environment.TickCount64 - startedAt);
+            return send;
+        }
+
+        return ObserveTimedSendAsync(send, message.Event, startedAt, _diagnostics);
+    }
+
+    private static async Task ObserveTimedSendAsync(
+        Task send,
+        string eventName,
+        long startedAt,
+        INuiDiagnosticsCollector diagnostics)
+    {
+        try
+        {
+            await send;
+        }
+        finally
+        {
+            diagnostics.RecordTiming($"send:{eventName}", Environment.TickCount64 - startedAt);
+        }
+    }
+
+    private void RecordRequestOperation(
+        string eventName,
+        string correlationId,
+        int payloadBytes,
+        long durationMs,
+        string status,
+        string? errorCode = null) =>
+        _diagnostics.RecordOperation(new NuiDiagnosticOperation(
+            0,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            "roundtrip",
+            "request",
+            eventName,
+            payloadBytes,
+            durationMs,
+            status,
+            correlationId,
+            errorCode));
 
     /// <summary>
     /// Logs an inbound envelope for diagnostics.
