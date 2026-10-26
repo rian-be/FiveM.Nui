@@ -167,5 +167,5 @@ jobs:
         with:
           name: "${{ matrix.name }}"
           working-directory: ${{ matrix.dir }}
-          file-coverage-mode: changes
-          threshold-icons: "{0: '🔴', 70: '🟠', 90: '🟢'}"
+          threshold-icons: "{0: '🔴', 50: '🟠', 80: '🟢'}"
+ 

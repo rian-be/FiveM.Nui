@@ -1,3 +1,4 @@
+using CitizenFX.FiveM.Client;
 using CitizenFX.FiveM.Shared;
 using CitizenFX.FiveM.Shared.Script;
 using FiveM.Nui;
@@ -99,7 +100,7 @@ public sealed class DevToolsClient : IScript
             NuiDevToolsProtocol.ConVarRefreshMs,
             NuiDevToolsProtocol.DefaultRefreshIntervalMs);
 
-        CitizenFX.FiveM.Client.API.SetInterval(MaintainState, refreshInterval);
+        API.SetInterval(MaintainState, refreshInterval);
         SharedAPI.Log.Info("[fivem-nui-devtools] Ready. Use /nui_devtools to toggle overlay.");
     }
 
@@ -109,11 +110,11 @@ public sealed class DevToolsClient : IScript
 
     private void RegisterEventHandlers()
     {
-        CitizenFX.FiveM.Client.API.OnEvent(NuiDevToolsProtocol.DiagnosticsEvent, new Action<string>(OnDiagnostics), false);
-        CitizenFX.FiveM.Client.API.OnEvent("onClientResourceStart", new Action<string>(OnResourceStarted), false);
-        CitizenFX.FiveM.Client.API.OnEvent("onResourceStart", new Action<string>(OnResourceStarted), false);
-        CitizenFX.FiveM.Client.API.OnEvent("onClientResourceStop", new Action<string>(OnResourceStopped), false);
-        CitizenFX.FiveM.Client.API.OnEvent("onResourceStop", new Action<string>(OnResourceStopped), false);
+        API.OnEvent(NuiDevToolsProtocol.DiagnosticsEvent, new Action<string>(OnDiagnostics));
+        API.OnEvent("onClientResourceStart", new Action<string>(OnResourceStarted));
+        API.OnEvent("onResourceStart", new Action<string>(OnResourceStarted));
+        API.OnEvent("onClientResourceStop", new Action<string>(OnResourceStopped));
+        API.OnEvent("onResourceStop", new Action<string>(OnResourceStopped));
     }
 
     private void RegisterNuiCallbacks()
