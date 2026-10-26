@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using FiveM.Nui.Abstractions.DevTools;
 using FiveM.Nui.DevTools.Client.Abstractions;
@@ -47,8 +48,9 @@ public sealed class ProviderManager(IDevToolsPlatform platform) : IProviderManag
         sample = null;
         if (string.IsNullOrWhiteSpace(json)) return false;
 
-        // Security: reject oversized JSON envelopes
-        if (json.Length > NuiDevToolsProtocol.MaxDiagnosticsJsonBytes)
+        // Security: reject oversized JSON envelopes (check UTF-8 byte count against limit)
+        if (json.Length > NuiDevToolsProtocol.MaxDiagnosticsJsonBytes ||
+            Encoding.UTF8.GetByteCount(json) > NuiDevToolsProtocol.MaxDiagnosticsJsonBytes)
         {
             return false;
         }

@@ -118,6 +118,17 @@ public sealed class NuiDevToolsPublisher : IDisposable, IAsyncDisposable
                 metric.Key.StartsWith("callback:", StringComparison.Ordinal))
             .Sum(static metric => metric.Value);
 
+        // Detect if diagnostics were reset (counters or operation sequences decreased)
+        var isCounterReset = messages < _lastMessages ||
+                             incoming < _lastIncoming ||
+                             outgoing < _lastOutgoing ||
+                             diagnostics.TotalPayloadSize < _lastBytes;
+
+        if (isCounterReset || (diagnostics.Operations.Count > 0 && diagnostics.Operations[^1].Sequence < _lastOperationSequence))
+        {
+            _lastOperationSequence = 0;
+        }
+
         IReadOnlyList<NuiDiagnosticOperation> operations;
         if (_options.IncludeTimeline)
         {
@@ -136,15 +147,22 @@ public sealed class NuiDevToolsPublisher : IDisposable, IAsyncDisposable
             operations = [];
         }
 
+        var deltaMessages = Math.Max(0, messages < _lastMessages ? messages : messages - _lastMessages);
+        var deltaIncoming = Math.Max(0, incoming < _lastIncoming ? incoming : incoming - _lastIncoming);
+        var deltaOutgoing = Math.Max(0, outgoing < _lastOutgoing ? outgoing : outgoing - _lastOutgoing);
+        var deltaBytes = Math.Max(0, diagnostics.TotalPayloadSize < _lastBytes
+            ? diagnostics.TotalPayloadSize
+            : diagnostics.TotalPayloadSize - _lastBytes);
+
         var sample = new NuiDevToolsSample(
             Version: NuiDevToolsProtocol.ProtocolVersion,
             Source: _resourceName,
             Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-            MessagesPerSecond: (messages - _lastMessages) / elapsedSeconds,
-            IncomingPerSecond: (incoming - _lastIncoming) / elapsedSeconds,
-            OutgoingPerSecond: (outgoing - _lastOutgoing) / elapsedSeconds,
+            MessagesPerSecond: deltaMessages / elapsedSeconds,
+            IncomingPerSecond: deltaIncoming / elapsedSeconds,
+            OutgoingPerSecond: deltaOutgoing / elapsedSeconds,
             AverageResponseMs: completedRequests == 0 ? 0 : totalResponseTime / (double)completedRequests,
-            BytesPerSecond: (diagnostics.TotalPayloadSize - _lastBytes) / elapsedSeconds,
+            BytesPerSecond: deltaBytes / elapsedSeconds,
             TotalMessages: messages,
             TotalBytes: diagnostics.TotalPayloadSize,
             LargestPayloadBytes: diagnostics.LargestPayload,
