@@ -1,6 +1,6 @@
 {
   "name": "@fivem-nui/svelte-components",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "UI components for FiveM NUI built on Svelte 5",
   "type": "module",
   "svelte": "./dist/index.js",
@@ -46,8 +46,8 @@
     "node": ">=22.12.0"
   },
   "peerDependencies": {
-    "@fivem-nui/core": "^1.0.0",
-    "@fivem-nui/svelte": "^1.0.0",
+    "@fivem-nui/core": "^1.1.0",
+    "@fivem-nui/svelte": "^1.1.0",
     "svelte": "^5.20.0"
   },
   "dependencies": {

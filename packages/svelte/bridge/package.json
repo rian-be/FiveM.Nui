@@ -1,6 +1,6 @@
 {
   "name": "@fivem-nui/svelte",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Svelte adapter and toolkit for FiveM NUI communication",
   "type": "module",
   "main": "dist/index.js",
@@ -63,7 +63,7 @@
     "svelte": ">=5.0.0"
   },
   "dependencies": {
-    "@fivem-nui/core": "^1.0.0",
+    "@fivem-nui/core": "^1.1.0",
     "@fivem-nui/error": "^1.0.0"
   },
   "devDependencies": {

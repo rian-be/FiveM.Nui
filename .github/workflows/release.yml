@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_wait:
+        description: 'Skip waiting for NuGet and NPM workflows'
+        type: boolean
+        default: false
+      draft:
+        description: 'Create as a draft release'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Create as a prerelease'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # -------------------------------------------------------------
+      # Gatekeeper: Wait for NuGet and NPM publishing workflows to succeed
+      # -------------------------------------------------------------
+      - name: Wait for NuGet and NPM publishing workflows
+        if: ${{ github.event_name == 'push' || github.event.inputs.skip_wait != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          echo "============================================================"
+          echo "Verifying upstream publishing pipelines for commit: $COMMIT_SHA"
+          echo "============================================================"
+
+          wait_for_workflow() {
+            local workflow="$1"
+            echo "--> Monitoring: $workflow"
+            local attempts=0
+            local max_attempts=40 # 40 * 15s = 10 minutes max wait time
+
+            while [ $attempts -lt $max_attempts ]; do
+              RUN_DATA=$(gh run list --workflow "$workflow" --commit "$COMMIT_SHA" --json databaseId,status,conclusion --jq '.[0]')
+
+              if [ -z "$RUN_DATA" ] || [ "$RUN_DATA" = "null" ]; then
+                echo "    Waiting for $workflow run to start..."
+                sleep 10
+                attempts=$((attempts + 1))
+                continue
+              fi
+
+              STATUS=$(echo "$RUN_DATA" | jq -r '.status')
+              CONCLUSION=$(echo "$RUN_DATA" | jq -r '.conclusion')
+
+              if [ "$STATUS" = "completed" ]; then
+                if [ "$CONCLUSION" = "success" ]; then
+                  echo "    ✅ $workflow completed successfully!"
+                  return 0
+                else
+                  echo "    ❌ $workflow finished with conclusion: $CONCLUSION"
+                  echo "Aborting GitHub Release to prevent mismatched or broken release state."
+                  exit 1
+                fi
+              fi
+
+              echo "    ⏳ $workflow status is '$STATUS'. Checking again in 15s..."
+              sleep 15
+              attempts=$((attempts + 1))
+            done
+
+            echo "❌ Timed out waiting for $workflow to complete."
+            exit 1
+          }
+
+          wait_for_workflow "nuget-publish.yml"
+          wait_for_workflow "npm-publish.yml"
+          echo "All upstream publishing workflows succeeded! Proceeding with GitHub Release."
+
+      # -------------------------------------------------------------
+      # Setup Environments & Build Release Assets
+      # -------------------------------------------------------------
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build & Pack NPM packages
+        run: |
+          mkdir -p dist
+          echo "Building TypeScript packages..."
+          (cd packages/fivem-nui/error && npm install --legacy-peer-deps && npm run build)
+          (cd packages/fivem-nui/core && npm install --legacy-peer-deps && npm run build)
+          (cd packages/svelte/bridge && npm install --legacy-peer-deps && npm run build)
+          (cd packages/svelte/components && npm install --legacy-peer-deps && npm run build)
+
+          echo "Packing npm archives (.tgz)..."
+          (cd packages/fivem-nui/error && npm pack --pack-destination ../../../dist)
+          (cd packages/fivem-nui/core && npm pack --pack-destination ../../../dist)
+          (cd packages/svelte/bridge && npm pack --pack-destination ../../../dist)
+          (cd packages/svelte/components && npm pack --pack-destination ../../../dist)
+
+      - name: Build & Pack NuGet packages
+        run: |
+          dotnet restore FiveM.Nui.slnx
+          dotnet build FiveM.Nui.slnx -c Release --no-restore
+          dotnet pack FiveM.Nui.slnx -c Release --no-build -o dist
+
+      - name: Build DevTools Resource (Web & Client)
+        if: hashFiles('Resources/fivem-nui-devtools/fxmanifest.lua') != ''
+        run: |
+          echo "Building DevTools Web Bundle..."
+          (cd Resources/fivem-nui-devtools/web && npm install --legacy-peer-deps && npm run build)
+
+          echo "Building DevTools C# Client..."
+          dotnet restore Resources/fivem-nui-devtools/src/Client/FiveM.Nui.DevTools.Client.csproj \
+            --source https://api.nuget.org/v3/index.json \
+            --source ./dist
+          dotnet publish Resources/fivem-nui-devtools/src/Client/FiveM.Nui.DevTools.Client.csproj \
+            -c Release --no-restore
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release-assets
+          cp dist/*.nupkg release-assets/ 2>/dev/null || true
+          cp dist/*.tgz release-assets/ 2>/dev/null || true
+
+          # Archive standalone fivem-nui-devtools resource into a ZIP
+          if [ -d "Resources/fivem-nui-devtools" ]; then
+            echo "Archiving fivem-nui-devtools resource..."
+            (cd Resources && zip -r ../release-assets/fivem-nui-devtools.zip fivem-nui-devtools \
+              -x "fivem-nui-devtools/web/node_modules/*" \
+              -x "fivem-nui-devtools/web/.svelte-kit/*" \
+              -x "fivem-nui-devtools/src/Client/obj/*" \
+              -x "fivem-nui-devtools/src/Client/bin/Debug/*")
+          fi
+
+      # -------------------------------------------------------------
+      # Create GitHub Release with Attached Assets
+      # -------------------------------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
