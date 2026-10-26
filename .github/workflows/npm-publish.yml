@@ -52,8 +52,8 @@ jobs:
           echo "Installing dependencies for all packages..."
           (cd packages/fivem-nui/error && npm install --legacy-peer-deps)
           (cd packages/fivem-nui/core && npm install --legacy-peer-deps)
-          (cd packages/svelte/bridge && npm install --legacy-peer-deps)
-          (cd packages/svelte/components && npm install --legacy-peer-deps)
+          (cd packages/svelte/bridge && npm install --no-save ../../fivem-nui/core --legacy-peer-deps)
+          (cd packages/svelte/components && npm install --no-save ../../fivem-nui/core ../bridge --legacy-peer-deps)
 
       - name: Build packages (dependency order)
         run: |

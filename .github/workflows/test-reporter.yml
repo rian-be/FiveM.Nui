@@ -103,13 +103,20 @@ jobs:
           npm --prefix packages/fivem-nui/core install --legacy-peer-deps
           npm --prefix packages/fivem-nui/core run build
           if [ "${{ matrix.name }}" = "@fivem-nui/svelte-components" ]; then
-            npm --prefix packages/svelte/bridge install --legacy-peer-deps
+            (cd packages/svelte/bridge && npm install --no-save ../../fivem-nui/core --legacy-peer-deps)
             npm --prefix packages/svelte/bridge run build
           fi
 
       - name: Install dependencies
         working-directory: ${{ matrix.dir }}
-        run: npm install --legacy-peer-deps
+        run: |
+          if [ "${{ matrix.name }}" = "@fivem-nui/svelte" ]; then
+            npm install --no-save ../../fivem-nui/core --legacy-peer-deps
+          elif [ "${{ matrix.name }}" = "@fivem-nui/svelte-components" ]; then
+            npm install --no-save ../../fivem-nui/core ../bridge --legacy-peer-deps
+          else
+            npm install --legacy-peer-deps
+          fi
 
       - name: Run Vitest with Coverage
         working-directory: ${{ matrix.dir }}

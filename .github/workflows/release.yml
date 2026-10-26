@@ -109,8 +109,8 @@ jobs:
           echo "Building TypeScript packages..."
           (cd packages/fivem-nui/error && npm install --legacy-peer-deps && npm run build)
           (cd packages/fivem-nui/core && npm install --legacy-peer-deps && npm run build)
-          (cd packages/svelte/bridge && npm install --legacy-peer-deps && npm run build)
-          (cd packages/svelte/components && npm install --legacy-peer-deps && npm run build)
+          (cd packages/svelte/bridge && npm install --no-save ../../fivem-nui/core --legacy-peer-deps && npm run build)
+          (cd packages/svelte/components && npm install --no-save ../../fivem-nui/core ../bridge --legacy-peer-deps && npm run build)
 
           echo "Packing npm archives (.tgz)..."
           (cd packages/fivem-nui/error && npm pack --pack-destination ../../../dist)
