@@ -10,7 +10,7 @@ import type {
 } from '@fivem-nui/core';
 import { installGlobalErrorHandlers, type GlobalErrorListenerOptions } from '@fivem-nui/error';
 
-type UntypedNuiClient = Omit<
+export type UntypedNuiClient = Omit<
   InstanceType<typeof CoreNuiClient>,
   'on' | 'once' | 'off' | 'send' | 'sendAndWait' | 'request' | 'callback' | 'onWindow'
 > & {
