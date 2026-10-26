@@ -19,3 +19,11 @@ export function bindState<T>(initialValue: T) {
     }
   };
 }
+
+export function runInRoot<T>(fn: () => T): { result: T; cleanup: () => void } {
+  let result!: T;
+  const cleanup = $effect.root(() => {
+    result = fn();
+  });
+  return { result, cleanup };
+}
