@@ -38,7 +38,7 @@ export class EventBus {
     return () => {
       set!.delete(listener);
 
-      if (set!.size === 0) {
+      if (set!.size === 0 && this.listeners.get(eventName) === set) {
         this.listeners.delete(eventName);
       }
     };
@@ -71,7 +71,7 @@ export class EventBus {
     if (handler) {
       set.delete(handler);
 
-      if (set.size === 0) {
+      if (set.size === 0 && this.listeners.get(eventName) === set) {
         this.listeners.delete(eventName);
       }
     } else {

@@ -25,6 +25,9 @@ public sealed class NuiDiagnosticsSnapshot
     /// </summary>
     public long LargestPayload { get; init; }
 
+    /// <summary>Gets the bounded list of recent transport operations.</summary>
+    public IReadOnlyList<NuiDiagnosticOperation> Operations { get; init; } = [];
+
     /// <summary>
     /// Renders the snapshot as a compact, single-line summary suitable for log output.
     /// </summary>
@@ -33,6 +36,6 @@ public sealed class NuiDiagnosticsSnapshot
     /// </returns>
     public override string ToString()
     {
-        return $"Counters: {Counters.Count}, Timings: {Timings.Count}, TotalPayload: {TotalPayloadSize}, LargestPayload: {LargestPayload}";
+        return $"Counters: {Counters.Count}, Timings: {Timings.Count}, Operations: {Operations.Count}, TotalPayload: {TotalPayloadSize}, LargestPayload: {LargestPayload}";
     }
 }

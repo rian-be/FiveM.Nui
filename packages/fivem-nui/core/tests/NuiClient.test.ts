@@ -644,6 +644,21 @@ describe('NuiClient listen (FiveM SendNuiMessage delivers JSON string)', () => {
 
     expect(handler).not.toHaveBeenCalled();
   });
+
+  it('does not let a stale listen disposer remove a later listener', () => {
+    const { client } = makeClient();
+    const handler = vi.fn();
+    client.on('state', handler);
+    const mocked = mockWindow();
+
+    const oldStop = client.listen(mocked.window);
+    oldStop();
+    client.listen(mocked.window);
+    oldStop();
+    mocked.dispatch(JSON.stringify({ type: 'event', event: 'state', payload: 1 }));
+
+    expect(handler).toHaveBeenCalledWith(1);
+  });
 });
 
 describe('MessageTransport', () => {
@@ -665,6 +680,16 @@ describe('MessageTransport', () => {
 
     expect(transport.callbackUrl('player name')).toBe('https://panel_test/player%20name');
     expect(transport.mainCallbackUrl).toBe('https://panel_test/nui');
+  });
+
+  it('rejects non-success HTTP responses as transport failures', async () => {
+    const transport = new MessageTransport('panel_test', 'nui', 1000, nullNuiLogger, () =>
+      Promise.resolve(new Response('failed', { status: 500 })),
+    );
+
+    await expect(transport.post('https://panel_test/nui', {})).rejects.toMatchObject({
+      code: NuiErrorCodes.Transport,
+    });
   });
 });
 

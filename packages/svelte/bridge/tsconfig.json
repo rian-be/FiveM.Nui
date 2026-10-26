@@ -16,8 +16,6 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "paths": {
-      "svelte": ["../../../Demo/system_resources/comps-demo/web/node_modules/svelte"],
-      "svelte/*": ["../../../Demo/system_resources/comps-demo/web/node_modules/svelte/*"],
       "@fivem-nui/core": ["../../fivem-nui/core/dist/index.d.ts"],
       "@fivem-nui/error": ["../../fivem-nui/error/dist/index.d.ts"]
     }

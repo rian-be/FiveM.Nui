@@ -6,6 +6,7 @@ using FiveM.Nui.Messaging;
 using FiveM.Nui.Serialization;
 using FiveM.Nui.Transport;
 using FiveM.Nui.Windows;
+using System.Text;
 
 namespace FiveM.Nui;
 
@@ -57,6 +58,7 @@ public partial class NuiClient :
     private INuiLogger _logger = null!;
     private CancellationTokenSource _cts = new();
     private IDisposable? _transportSubscription;
+    private IDisposable? _devToolsPublisher;
     private readonly SemaphoreSlim _configurationGate = new(1, 1);
     private int _disposed;
 
@@ -280,7 +282,25 @@ public partial class NuiClient :
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(json);
         _lifecycle.MarkReady("page sent traffic");
+        if (_diagnostics.IsEnabled)
+        {
+            _diagnostics.RecordPayload(Encoding.UTF8.GetByteCount(json));
+        }
         _transport.OnMessageReceived(json);
+    }
+
+    /// <summary>
+    /// Enables automatic emission of diagnostics samples to the DevTools bus.
+    /// </summary>
+    /// <param name="options">Options customizing interval and timeline capture.</param>
+    /// <returns>An <see cref="IDisposable"/> that stops publishing when disposed.</returns>
+    public IDisposable EnableDevTools(FiveM.Nui.Abstractions.DevTools.NuiDevToolsOptions? options = null)
+    {
+        ThrowIfDisposed();
+        _devToolsPublisher?.Dispose();
+        var publisher = new FiveM.Nui.Diagnostics.NuiDevToolsPublisher(_diagnostics, _options.Runtime?.ResourceName ?? "resource", options);
+        _devToolsPublisher = publisher;
+        return publisher;
     }
     
     /// <summary>
@@ -301,6 +321,7 @@ public partial class NuiClient :
             _logger.LogInformation("Disposing.");
 
             _lifecycle.MarkDisposed();
+            _devToolsPublisher?.Dispose();
             _transportSubscription?.Dispose();
             try
             {

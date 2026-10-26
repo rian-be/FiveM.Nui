@@ -65,7 +65,7 @@
 
   const safePageSize = $derived(
     typeof pageSize === 'number' && Number.isFinite(pageSize) && pageSize > 0
-      ? Math.floor(pageSize)
+      ? Math.max(1, Math.floor(pageSize))
       : 10
   );
 

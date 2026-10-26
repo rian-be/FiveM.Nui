@@ -7,7 +7,7 @@ import {
   defaultIsRenderError,
   formatStackTrace,
   parseStackTrace
-} from '../src/index.js';
+} from '../src';
 
 describe('Global Error Listeners & StackTrace', () => {
   let originalWindow: any;
