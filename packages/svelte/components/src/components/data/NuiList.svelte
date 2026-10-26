@@ -123,7 +123,11 @@
       {#if item.switch}
         <label class="nui-list-item-label" class:disabled={item.disabled}>
           {#if item.icon}
-            <span class="nui-list-item-icon" aria-hidden="true">{item.icon}</span>
+            {#if item.icon.startsWith('fa-') || item.icon.includes('fa-')}
+              <span class="nui-list-item-icon" aria-hidden="true"><i class={item.icon}></i></span>
+            {:else}
+              <span class="nui-list-item-icon" aria-hidden="true">{item.icon}</span>
+            {/if}
           {/if}
           <span class="nui-list-item-text">
             <span class="nui-list-item-title">{item.label}</span>
@@ -152,7 +156,11 @@
           onclick={() => handleItemClick(item)}
         >
           {#if item.icon}
-            <span class="nui-list-item-icon" aria-hidden="true">{item.icon}</span>
+            {#if item.icon.startsWith('fa-') || item.icon.includes('fa-')}
+              <span class="nui-list-item-icon" aria-hidden="true"><i class={item.icon}></i></span>
+            {:else}
+              <span class="nui-list-item-icon" aria-hidden="true">{item.icon}</span>
+            {/if}
           {/if}
           <span class="nui-list-item-text">
             <span class="nui-list-item-title">{item.label}</span>

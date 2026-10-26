@@ -1,4 +1,5 @@
 using FiveM.Nui.Hosting;
+using System.Text;
 
 namespace FiveM.Nui;
 
@@ -14,19 +15,33 @@ public partial class NuiClient
     /// <param name="payload">The payload to deliver.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task that completes once the event has been posted.</returns>
-    public async Task SendAsync<T>(string eventName, T payload, CancellationToken cancellationToken = default)
+    public Task SendAsync<T>(string eventName, T payload, CancellationToken cancellationToken = default)
     {
+        try
+        {
+            return SendCore(eventName, payload, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            // Keep the exception behavior of the former async implementation:
+            // argument and serialization failures are observed through the task.
+            return Task.FromException(exception);
+        }
+    }
+
+    private Task SendCore<T>(string eventName, T payload, CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        ValidateEventName(eventName);
         var message = NuiMessage.CreateEvent(eventName, payload);
         var json = _serializer.Serialize(message);
 
-        EnsureWithinPayloadLimit(json.Length, eventName);
-        _diagnostics.IncrementCounter("messages_sent");
-        _diagnostics.RecordPayload(json.Length);
-
-        _logger.LogDebug("-> EVENT '{Event}' ({Bytes} bytes)", eventName, json.Length);
+        var size = GetPayloadSize(json, eventName);
+        if (_logger.IsEnabled(NuiLogLevel.Debug))
+            _logger.LogDebug("-> EVENT '{Event}' ({Bytes} bytes)", eventName, size);
         LogPayload("->", message);
 
-        await _transport.SendAsync(message, cancellationToken);
+        return SendPreparedAsync(message, json, size, cancellationToken);
     }
 
     /// <summary>
@@ -46,9 +61,14 @@ public partial class NuiClient
         TRequest request,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
+        ValidateEventName(eventName);
+        var requestManager = _requestManager;
+        var builtInRequestManager = requestManager as ConcurrentRequestManager;
+        var clientToken = _cts.Token;
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
-            _cts.Token);
+            clientToken);
 
         var timeout = _options.DefaultTimeout;
         if (timeout != Timeout.InfiniteTimeSpan)
@@ -59,7 +79,8 @@ public partial class NuiClient
         var correlationId = Guid.CreateVersion7().ToString();
         var message = NuiMessage.CreateRequest(correlationId, eventName, request);
 
-        EnsureWithinPayloadLimit(_serializer.Serialize(message).Length, eventName);
+        var json = _serializer.Serialize(message);
+        var size = GetPayloadSize(json, eventName);
 
         // RunContinuationsAsynchronously keeps the awaiting caller (and its
         // continuation) off the transport/inbound thread that completes the
@@ -69,34 +90,60 @@ public partial class NuiClient
         if (_options.PendingRequestTimeout != TimeSpan.Zero && 
             _options.PendingRequestTimeout != TimeSpan.FromMilliseconds(0))
         {
-            _requestManager.CleanupExpired(_options.PendingRequestTimeout);
+            if (builtInRequestManager is not null)
+                builtInRequestManager.CleanupExpiredIfDue(_options.PendingRequestTimeout);
+            else
+                requestManager.CleanupExpired(_options.PendingRequestTimeout);
         }
 
-        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _requestManager.RegisterPendingRequest(correlationId, tcs);
+        TaskCompletionSource<TResponse>? typedCompletion = null;
+        TaskCompletionSource<string>? jsonCompletion = null;
+        if (builtInRequestManager is not null)
+        {
+            typedCompletion = new TaskCompletionSource<TResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+            builtInRequestManager.RegisterPendingRequest(correlationId, typedCompletion);
+        }
+        else
+        {
+            jsonCompletion = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            requestManager.RegisterPendingRequest(correlationId, jsonCompletion);
+        }
 
         var startedAt = Environment.TickCount64;
 
-        _logger.LogDebug("-> REQUEST '{Event}' id={CorrelationId}", eventName, correlationId);
+        if (_logger.IsEnabled(NuiLogLevel.Debug))
+            _logger.LogDebug("-> REQUEST '{Event}' id={CorrelationId}", eventName, correlationId);
         LogPayload("->", message);
 
         try
         {
-            await _transport.SendAsync(message, linkedCts.Token);
+            await SendPreparedAsync(message, json, size, linkedCts.Token);
 
-            var responseJson = await tcs.Task.WaitAsync(linkedCts.Token);
+            TResponse response;
+            if (typedCompletion is not null)
+            {
+                response = await typedCompletion.Task.WaitAsync(linkedCts.Token);
+            }
+            else
+            {
+                var responseJson = await jsonCompletion!.Task.WaitAsync(linkedCts.Token);
+                response = _serializer.Deserialize<TResponse>(responseJson)!;
+            }
             var elapsed = Environment.TickCount64 - startedAt;
 
             _diagnostics.RecordTiming($"request:{eventName}", elapsed);
             _diagnostics.IncrementCounter("requests_completed");
-            _logger.LogDebug("<- RESPONSE for '{Event}' id={CorrelationId} in {Elapsed}ms",
-                eventName, correlationId, elapsed);
+            RecordRequestOperation(eventName, correlationId, size, elapsed, "completed");
+            if (_logger.IsEnabled(NuiLogLevel.Debug))
+                _logger.LogDebug("<- RESPONSE for '{Event}' id={CorrelationId} in {Elapsed}ms",
+                    eventName, correlationId, elapsed);
 
-            return _serializer.Deserialize<TResponse>(responseJson)!;
+            return response;
         }
-        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        catch (OperationCanceledException) when (clientToken.IsCancellationRequested)
         {
             _diagnostics.IncrementCounter("requests_cancelled");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "cancelled");
             _logger.LogWarning("Request '{Event}' id={CorrelationId} canceled (client disposed)",
                 eventName, correlationId);
             throw;
@@ -107,6 +154,7 @@ public partial class NuiClient
             // deadline. Reporting it as a timeout would poison the timeout
             // counter and mislead diagnosis.
             _diagnostics.IncrementCounter("requests_cancelled");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "cancelled");
             _logger.LogWarning("Request '{Event}' id={CorrelationId} canceled by caller",
                 eventName, correlationId);
             throw;
@@ -114,6 +162,7 @@ public partial class NuiClient
         catch (OperationCanceledException)
         {
             _diagnostics.IncrementCounter("requests_timeout");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "timeout", "TIMEOUT");
             _logger.LogError("Request '{Event}' id={CorrelationId} timed out after {Timeout}s",
                 eventName, correlationId, timeout.TotalSeconds);
             throw;
@@ -121,13 +170,15 @@ public partial class NuiClient
         catch (Exception ex)
         {
             _diagnostics.IncrementCounter("requests_failed");
+            RecordRequestOperation(eventName, correlationId, size, Environment.TickCount64 - startedAt, "failed",
+                ex is NuiException nuiException ? nuiException.ErrorCode : ex.GetType().Name);
             _logger.LogError(ex, "Request '{Event}' id={CorrelationId} failed",
                 eventName, correlationId);
             throw;
         }
         finally
         {
-            _requestManager.UnregisterPendingRequest(correlationId);
+            requestManager.UnregisterPendingRequest(correlationId);
         }
     }
 
@@ -139,14 +190,126 @@ public partial class NuiClient
     /// <param name="payload">The payload to deliver.</param>
     public void Publish<T>(string eventName, T payload)
     {
-        _diagnostics.IncrementCounter("events_published");
-
+        ThrowIfDisposed();
+        ValidateEventName(eventName);
         var message = NuiMessage.CreateEvent(eventName, payload);
-        _logger.LogDebug("-> PUBLISH '{Event}'", eventName);
+        var json = _serializer.Serialize(message);
+        var size = GetPayloadSize(json, eventName);
+        _diagnostics.IncrementCounter("events_published");
+        if (_logger.IsEnabled(NuiLogLevel.Debug))
+            _logger.LogDebug("-> PUBLISH '{Event}'", eventName);
         LogPayload("->", message);
 
-        _ = _transport.SendAsync(message, _cts.Token);
+        var logger = _logger;
+        var diagnostics = _diagnostics;
+        try
+        {
+            var send = SendPreparedAsync(message, json, size, _cts.Token);
+            if (!send.IsCompletedSuccessfully)
+            {
+                _ = ObservePublishAsync(send, eventName, logger, diagnostics);
+            }
+        }
+        catch (Exception ex)
+        {
+            diagnostics.IncrementCounter("events_publish_failed");
+            logger.LogError(ex, "Failed to publish '{Event}'", eventName);
+        }
     }
+
+    private static async Task ObservePublishAsync(
+        Task send,
+        string eventName,
+        INuiLogger logger,
+        INuiDiagnosticsCollector diagnostics)
+    {
+        try
+        {
+            await send;
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogDebug("Publish '{Event}' was canceled", eventName);
+        }
+        catch (Exception ex)
+        {
+            diagnostics.IncrementCounter("events_publish_failed");
+            logger.LogError(ex, "Failed to publish '{Event}'", eventName);
+        }
+    }
+
+    private Task SendPreparedAsync(
+        NuiMessage message,
+        string json,
+        int size,
+        CancellationToken cancellationToken)
+    {
+        _diagnostics.IncrementCounter("messages_sent");
+        _diagnostics.RecordPayload(size);
+        _diagnostics.RecordOperation(new NuiDiagnosticOperation(
+            0,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            "outbound",
+            message.Type,
+            message.Event,
+            size,
+            null,
+            "sent",
+            message.Id));
+
+        var startedAt = Environment.TickCount64;
+        var send = _transport is FiveM.Nui.Transport.FiveMNuiTransport transport
+            ? transport.SendSerializedAsync(message, json, cancellationToken)
+            : _transport.SendAsync(message, cancellationToken);
+
+        if (!_diagnostics.IsEnabled)
+        {
+            return send;
+        }
+
+        if (send.IsCompletedSuccessfully)
+        {
+            _diagnostics.RecordTiming($"send:{message.Event}", Environment.TickCount64 - startedAt);
+            return send;
+        }
+
+        return ObserveTimedSendAsync(send, message.Event, startedAt, _diagnostics);
+    }
+
+    private static async Task ObserveTimedSendAsync(
+        Task send,
+        string eventName,
+        long startedAt,
+        INuiDiagnosticsCollector diagnostics)
+    {
+        try
+        {
+            await send;
+        }
+        finally
+        {
+            diagnostics.RecordTiming($"send:{eventName}", Environment.TickCount64 - startedAt);
+        }
+    }
+
+    private void RecordRequestOperation(
+        string eventName,
+        string correlationId,
+        int payloadBytes,
+        long durationMs,
+        string status,
+        string? errorCode = null) =>
+        _diagnostics.RecordOperation(new NuiDiagnosticOperation(
+            0,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            "roundtrip",
+            "request",
+            eventName,
+            payloadBytes,
+            durationMs,
+            status,
+            correlationId,
+            errorCode));
 
     /// <summary>
     /// Logs an inbound envelope for diagnostics.
@@ -166,24 +329,38 @@ public partial class NuiClient
     /// NUI is untrusted input and the CEF bridge has a hard size ceiling, so an
     /// oversized envelope is rejected before it reaches the transport.
     /// </summary>
-    /// <param name="size">The serialized envelope size, in bytes.</param>
+    /// <param name="json">The serialized envelope.</param>
     /// <param name="eventName">The event name reported in the rejection message.</param>
     /// <exception cref="NuiException">
-    /// <paramref name="size"/> exceeds <see cref="NuiOptions.MaxPayloadSize"/>.
+    /// The UTF-8 representation exceeds <see cref="NuiOptions.MaxPayloadSize"/>.
     /// </exception>
-    private void EnsureWithinPayloadLimit(int size, string eventName)
+    private int GetPayloadSize(string json, string eventName)
     {
-        if (size <= _options.MaxPayloadSize)
+        var limit = _options.MaxPayloadSize;
+
+        // A UTF-16 code unit needs at most three UTF-8 bytes. Most production
+        // envelopes are far below the limit, and with metrics/logging disabled
+        // their exact byte count is never observed. Avoid a second full scan.
+        if (!_diagnostics.IsEnabled &&
+            !_logger.IsEnabled(NuiLogLevel.Debug) &&
+            json.Length <= limit / 3)
         {
-            return;
+            return json.Length;
         }
+
+        var size = Encoding.UTF8.GetByteCount(json);
+        if (size <= limit)
+            return size;
 
         _diagnostics.IncrementCounter("payloads_rejected");
 
         throw new NuiException(
             "PAYLOAD_TOO_LARGE",
-            $"'{eventName}' serialized to {size} bytes, limit is {_options.MaxPayloadSize}");
+            $"'{eventName}' serialized to {size} bytes, limit is {limit}");
     }
+
+    private static void ValidateEventName(string eventName) =>
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventName);
 
     /// <summary>
     /// Logs the serialized payload at debug level when <see cref="NuiOptions.LogPayloads"/>

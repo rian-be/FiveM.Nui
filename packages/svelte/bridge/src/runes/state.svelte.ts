@@ -1,7 +1,7 @@
 import { onDestroy } from 'svelte';
 import type { NuiEventKey, NuiEventPayload } from '@fivem-nui/core';
 import { globalErrorHandler } from '@fivem-nui/error';
-import type { SvelteNuiClient } from '../client';
+import type { SvelteNuiClient, UntypedNuiClient } from '../client';
 import { useNuiClient } from '../context';
 
 export interface NuiStateOptions<T> {
@@ -88,7 +88,7 @@ export class NuiStateController<T> implements NuiState<T> {
     this.initialValue = initialValue;
     this.value = initialValue;
 
-    this.unsubscribe = client.on(eventName, (data: unknown) => {
+    this.unsubscribe = (client as unknown as UntypedNuiClient).on(eventName, (data: unknown) => {
       try {
         this.value = options.transform ? options.transform(data) : (data as T);
         this.updatedAt = Date.now();

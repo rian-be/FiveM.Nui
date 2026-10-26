@@ -84,7 +84,16 @@ internal sealed class TypeMapper(
 
         if (TypeIntrospection.TryGetElementType(type, out var elementType))
         {
-            return MapChild(elementType, info?.ElementType) + "[]";
+            var elementInfo = type.IsArray
+                ? info?.ElementType
+                : info?.GenericTypeArguments is { Length: > 0 } arguments ? arguments[0] : null;
+            var element = MapChild(elementType, elementInfo);
+            if (element.Contains(" | ", StringComparison.Ordinal) ||
+                element.Contains(" & ", StringComparison.Ordinal))
+            {
+                element = $"({element})";
+            }
+            return element + "[]";
         }
 
         if (type.IsArray || typeof(IEnumerable).IsAssignableFrom(type))

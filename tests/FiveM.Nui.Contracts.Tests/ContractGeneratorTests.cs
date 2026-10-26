@@ -10,6 +10,20 @@ namespace FiveM.Nui.Contracts.Tests;
 /// </summary>
 public class ContractGeneratorTests : ContractGeneratorTestBase
 {
+    [Fact]
+    public void Generate_GroupsNullableCollectionElements()
+    {
+        var generator = new ContractGenerator(new ContractGeneratorOptions
+        {
+            Nullability = NullabilityMode.Nullable,
+        });
+
+        var ts = generator.Generate([typeof(NullableCollections)]);
+
+        Assert.Contains("arrayItems: (string | null)[];", ts);
+        Assert.Contains("listItems: (string | null)[];", ts);
+    }
+
     /// <summary>
     /// Emits scalar members with camelCase names and references to enums.
     /// </summary>

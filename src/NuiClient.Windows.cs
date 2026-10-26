@@ -15,6 +15,7 @@ public partial class NuiClient
     /// <returns>A task that completes once the open envelope has been posted.</returns>
     public async Task OpenAsync(string windowName, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         await _windowManager.OpenAsync(windowName, cancellationToken);
 
         // Opening a window means the page has to exist, but it is not proof the
@@ -30,9 +31,10 @@ public partial class NuiClient
     /// <returns>A task that completes once the close envelope has been posted.</returns>
     public async Task CloseAsync(string windowName, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         await _windowManager.CloseAsync(windowName, cancellationToken);
 
-        if (!_lifecycle.IsDisposed)
+        if (!_lifecycle.IsDisposed && _windowManager.GetFocusedWindow() is null)
         {
             _lifecycle.TryTransition(NuiLifecycleState.Hidden, $"'{windowName}' closed");
         }
@@ -47,6 +49,7 @@ public partial class NuiClient
     /// <returns>A task that completes once focus has been attempted.</returns>
     public async Task FocusAsync(string windowName, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         await _windowManager.FocusAsync(windowName, cancellationToken);
 
         // Focus only succeeded if the window manager now reports it as the
@@ -67,6 +70,7 @@ public partial class NuiClient
     /// <returns>A task that completes once the unfocusing has been attempted.</returns>
     public async Task UnfocusAsync(string windowName, CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         await _windowManager.UnfocusAsync(windowName, cancellationToken);
         if (_windowManager.GetFocusedWindow() is null)
         {

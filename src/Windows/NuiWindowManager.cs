@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace FiveM.Nui.Windows;
 
 /// <summary>
@@ -8,7 +6,8 @@ namespace FiveM.Nui.Windows;
 public sealed class NuiWindowManager(INuiLogger logger, INuiRuntime runtime, INuiSerializer serializer)
     : INuiWindowManager
 {
-    private readonly ConcurrentDictionary<string, NuiWindowState> _windows = new();
+    private readonly Lock _gate = new();
+    private readonly Dictionary<string, NuiWindowState> _windows = [];
     private string? _focusedWindow;
 
     /// <summary>
@@ -24,17 +23,29 @@ public sealed class NuiWindowManager(INuiLogger logger, INuiRuntime runtime, INu
     /// <returns>A completed task.</returns>
     public Task OpenAsync(string windowName, CancellationToken cancellationToken = default)
     {
-        var state = _windows.GetOrAdd(windowName, _ => new NuiWindowState { Name = windowName });
-        state.IsOpen = true;
-        
-        Post(windowName, "open");
-        
-        _focusedWindow = windowName;
-        state.HasFocus = true;
-        runtime.SetNuiFocus(true);
+        ValidateWindowName(windowName);
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
 
-        logger.LogInformation("Opened window: {Window} (focused={Focused})",
-            windowName, _focusedWindow ?? "-");
+        lock (_gate)
+        {
+            if (!_windows.TryGetValue(windowName, out var state))
+            {
+                state = new NuiWindowState { Name = windowName };
+                _windows.Add(windowName, state);
+            }
+
+            Post(windowName, "open");
+            state.IsOpen = true;
+
+            runtime.SetNuiFocus(true);
+            ClearPreviousFocus(windowName);
+            _focusedWindow = windowName;
+            state.HasFocus = true;
+
+            logger.LogInformation("Opened window: {Window} (focused={Focused})",
+                windowName, _focusedWindow);
+        }
 
         return Task.CompletedTask;
     }
@@ -51,26 +62,30 @@ public sealed class NuiWindowManager(INuiLogger logger, INuiRuntime runtime, INu
     /// <returns>A completed task.</returns>
     public Task CloseAsync(string windowName, CancellationToken cancellationToken = default)
     {
-        var state = _windows.GetValueOrDefault(windowName);
+        ValidateWindowName(windowName);
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
 
-        // C# 14 null-conditional assignment: clear the flag only when the window
-        // exists, so a mis-timed close after a reload cannot fault here.
-        state?.IsOpen = false;
-
-        if (state is null)
+        lock (_gate)
         {
-            logger.LogWarning("Close requested for unknown window: {Window}", windowName);
-            return Task.CompletedTask;
-        }
+            if (!_windows.TryGetValue(windowName, out var state))
+            {
+                logger.LogWarning("Close requested for unknown window: {Window}", windowName);
+                return Task.CompletedTask;
+            }
 
-        if (_focusedWindow == windowName)
-        {
-            _focusedWindow = null;
-            runtime.SetNuiFocus(false);
-        }
+            Post(windowName, "close");
 
-        Post(windowName, "close");
-        logger.LogInformation("Closed window: {Window}", windowName);
+            if (_focusedWindow == windowName)
+            {
+                runtime.SetNuiFocus(false);
+                _focusedWindow = null;
+            }
+
+            state.IsOpen = false;
+            state.HasFocus = false;
+            logger.LogInformation("Closed window: {Window}", windowName);
+        }
 
         return Task.CompletedTask;
     }
@@ -88,20 +103,27 @@ public sealed class NuiWindowManager(INuiLogger logger, INuiRuntime runtime, INu
     /// <returns>A completed task.</returns>
     public Task FocusAsync(string windowName, CancellationToken cancellationToken = default)
     {
-        if (_windows.TryGetValue(windowName, out var state) && state.IsOpen)
-        {
-            Post(windowName, "focus");
-            
-            _focusedWindow = windowName;
-            state.HasFocus = true;
+        ValidateWindowName(windowName);
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
 
-            runtime.SetNuiFocus(true);
-
-            logger.LogInformation("Focused window: {Window}", windowName);
-        }
-        else
+        lock (_gate)
         {
-            logger.LogWarning("Cannot focus '{Window}': not open", windowName);
+            if (_windows.TryGetValue(windowName, out var state) && state.IsOpen)
+            {
+                Post(windowName, "focus");
+                runtime.SetNuiFocus(true);
+
+                ClearPreviousFocus(windowName);
+                _focusedWindow = windowName;
+                state.HasFocus = true;
+
+                logger.LogInformation("Focused window: {Window}", windowName);
+            }
+            else
+            {
+                logger.LogWarning("Cannot focus '{Window}': not open", windowName);
+            }
         }
 
         return Task.CompletedTask;
@@ -119,23 +141,29 @@ public sealed class NuiWindowManager(INuiLogger logger, INuiRuntime runtime, INu
     /// <returns>A completed task.</returns>
     public Task UnfocusAsync(string windowName, CancellationToken cancellationToken = default)
     {
-        var state = _windows.GetValueOrDefault(windowName);
-        state?.HasFocus = false;
+        ValidateWindowName(windowName);
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
 
-        if (state is null)
+        lock (_gate)
         {
-            logger.LogWarning("Unfocus requested for unknown window: {Window}", windowName);
-            return Task.CompletedTask;
-        }
+            if (!_windows.TryGetValue(windowName, out var state))
+            {
+                logger.LogWarning("Unfocus requested for unknown window: {Window}", windowName);
+                return Task.CompletedTask;
+            }
 
-        if (_focusedWindow == windowName)
-        {
-            _focusedWindow = null;
-            runtime.SetNuiFocus(false);
-        }
+            Post(windowName, "unfocus");
 
-        Post(windowName, "unfocus");
-        logger.LogInformation("Unfocused window: {Window}", windowName);
+            if (_focusedWindow == windowName)
+            {
+                runtime.SetNuiFocus(false);
+                _focusedWindow = null;
+            }
+
+            state.HasFocus = false;
+            logger.LogInformation("Unfocused window: {Window}", windowName);
+        }
 
         return Task.CompletedTask;
     }
@@ -158,17 +186,42 @@ public sealed class NuiWindowManager(INuiLogger logger, INuiRuntime runtime, INu
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to post '{Type}' for window {Window}", type, windowName);
+            throw;
         }
+    }
+
+    private void ClearPreviousFocus(string nextWindow)
+    {
+        if (_focusedWindow is not null &&
+            _focusedWindow != nextWindow &&
+            _windows.TryGetValue(_focusedWindow, out var previous))
+        {
+            previous.HasFocus = false;
+        }
+    }
+
+    private static void ValidateWindowName(string windowName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(windowName);
     }
 
     /// <summary>
     /// Gets the currently focused window.
     /// </summary>
-    public string? GetFocusedWindow() => _focusedWindow;
+    public string? GetFocusedWindow()
+    {
+        lock (_gate)
+            return _focusedWindow;
+    }
 
     /// <summary>
     /// Checks if a window has keyboard ownership.
     /// </summary>
-    public bool HasKeyboardOwnership(string windowName) => _focusedWindow == windowName;
+    public bool HasKeyboardOwnership(string windowName)
+    {
+        ValidateWindowName(windowName);
+        lock (_gate)
+            return _focusedWindow == windowName;
+    }
 }
 

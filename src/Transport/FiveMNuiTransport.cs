@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 using FiveM.Nui.Common;
 
 namespace FiveM.Nui.Transport;
@@ -17,22 +18,41 @@ public sealed class FiveMNuiTransport(INuiSerializer serializer, INuiLogger logg
     /// Serializes <paramref name="message"/> and hands it to the runtime.
     /// </summary>
     /// <param name="message">The envelope to send.</param>
-    /// <param name="cancellationToken">Cancellation token; an already canceled token skips the sending.</param>
+    /// <param name="cancellationToken">Cancellation token; an already canceled token returns a canceled task without sending.</param>
     public Task SendAsync(NuiMessage message, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(message);
         if (cancellationToken.IsCancellationRequested)
         {
-            logger.LogDebug("Send cancelled for '{Event}'", message.Event);
-            return Task.CompletedTask;
+            if (logger.IsEnabled(NuiLogLevel.Debug))
+                logger.LogDebug("Send cancelled for '{Event}'", message.Event);
+            return Task.FromCanceled(cancellationToken);
         }
 
         var json = serializer.Serialize(message);
+        return SendSerializedAsync(message, json, cancellationToken);
+    }
 
-        logger.LogDebug("Transport -> type={Type} event='{Event}' id={CorrelationId} ({Bytes} bytes)",
-            message.Type,
-            message.Event,
-            message.Id ?? "-",
-            json.Length);
+    /// <summary>
+    /// Sends an envelope already serialized by the client for payload-limit
+    /// validation, avoiding a second JSON serialization on the hot path.
+    /// </summary>
+    internal Task SendSerializedAsync(
+        NuiMessage message,
+        string json,
+        CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
+
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+        {
+            logger.LogDebug("Transport -> type={Type} event='{Event}' id={CorrelationId} ({Bytes} bytes)",
+                message.Type,
+                message.Event,
+                message.Id ?? "-",
+                Encoding.UTF8.GetByteCount(json));
+        }
 
         runtime.SendNuiMessage(json);
         return Task.CompletedTask;
@@ -45,14 +65,17 @@ public sealed class FiveMNuiTransport(INuiSerializer serializer, INuiLogger logg
     /// <returns>An <see cref="IDisposable"/> that removes the subscription.</returns>
     public IDisposable Subscribe(Action<NuiMessage> handler)
     {
+        ArgumentNullException.ThrowIfNull(handler);
         _handlers.TryAdd(handler, 0);
-        logger.LogDebug("Transport subscriber added (total={Count})", _handlers.Count);
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+            logger.LogDebug("Transport subscriber added (total={Count})", _handlers.Count);
 
         return new DisposableAction(() =>
         {
             if (_handlers.TryRemove(handler, out _))
             {
-                logger.LogDebug("Transport subscriber removed (total={Count})", _handlers.Count);
+                if (logger.IsEnabled(NuiLogLevel.Debug))
+                    logger.LogDebug("Transport subscriber removed (total={Count})", _handlers.Count);
             }
         });
     }
@@ -67,6 +90,7 @@ public sealed class FiveMNuiTransport(INuiSerializer serializer, INuiLogger logg
     /// <param name="json">The raw envelope posted by the page.</param>
     public void OnMessageReceived(string json)
     {
+        ArgumentNullException.ThrowIfNull(json);
         NuiMessage? message;
 
         try
@@ -85,10 +109,13 @@ public sealed class FiveMNuiTransport(INuiSerializer serializer, INuiLogger logg
             return;
         }
 
-        logger.LogDebug("Transport <- type={Type} event='{Event}' id={CorrelationId}",
-            message.Type,
-            message.Event,
-            message.Id ?? "-");
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+        {
+            logger.LogDebug("Transport <- type={Type} event='{Event}' id={CorrelationId}",
+                message.Type,
+                message.Event,
+                message.Id ?? "-");
+        }
 
         foreach (var handler in _handlers.Keys)
         {

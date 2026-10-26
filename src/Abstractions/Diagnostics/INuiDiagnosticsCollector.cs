@@ -6,6 +6,12 @@ namespace FiveM.Nui.Abstractions.Diagnostics;
 public interface INuiDiagnosticsCollector : INuiDiagnosticsProvider
 {
     /// <summary>
+    /// Reports whether recording is active. The default keeps custom collectors
+    /// enabled and therefore preserves exact measurements for existing implementations.
+    /// </summary>
+    bool IsEnabled => true;
+
+    /// <summary>
     /// Increments named counter.
     /// </summary>
     void IncrementCounter(string name);
@@ -19,6 +25,9 @@ public interface INuiDiagnosticsCollector : INuiDiagnosticsProvider
     /// Records payload size in bytes.
     /// </summary>
     void RecordPayload(int size);
+
+    /// <summary>Appends an operation to the bounded diagnostics timeline.</summary>
+    void RecordOperation(NuiDiagnosticOperation operation) { }
 
     /// <summary>
     /// Resets all collected metrics to zero.

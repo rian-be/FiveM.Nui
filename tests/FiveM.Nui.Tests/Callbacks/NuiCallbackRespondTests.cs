@@ -1,134 +1,45 @@
 using System.Text.Json;
+using FiveM.Nui.Callbacks;
+using FiveM.Nui.Hosting;
 
 namespace FiveM.Nui.Tests.Callbacks;
 
-/// <summary>
-/// Covers answering raw NUI invocation, the exact contract that cannot be
-/// simulated without the runtime.
-/// </summary>
-/// <remarks>
-/// The runtime hands the handler two arguments: the request and a response
-/// function. Registering a single-argument delegate drops the second, so the
-/// POST never completes and times out in the browser. These tests pin down that
-/// every path answers: success, bad body, and a throwing handler.
-/// </remarks>
 public sealed class NuiCallbackRespondTests
 {
-    /// <summary>
-    /// Mirrors the delegate registered by <c>NuiCallbackBridge</c>: two
-    /// arguments, with the response in the <c>finally</c>-equivalent.
-    /// </summary>
-    private static Action<object, Action<object>> Bridge(Action<string> handler) =>
-        (request, respond) =>
-        {
-            string body;
-            try
-            {
-                body = BodyOf(request);
-            }
-            catch (JsonException)
-            {
-                respond(new { code = "bad_request" });
-                return;
-            }
-
-            try
-            {
-                handler(body);
-            }
-            catch (Exception exception)
-            {
-                respond(new { code = "handler_error", message = exception.Message });
-                return;
-            }
-
-            respond(new { code = "ok", message = string.Empty });
-        };
-
-    private static string BodyOf(object? request) => request switch
+    [Fact]
+    public async Task Invocation_WaitsForHandlerAndAnswersExactlyOnce()
     {
-        IDictionary<object, object> untyped when untyped.TryGetValue("body", out var body) =>
-            body as string ?? string.Empty,
-        IDictionary<string, object> typed when typed.TryGetValue("body", out var typedBody) =>
-            typedBody as string ?? string.Empty,
-        JsonElement { ValueKind: JsonValueKind.Object } element
-            when element.TryGetProperty("body", out var jsonBody) =>
-            jsonBody.GetString() ?? string.Empty,
-        string raw => raw,
-        _ => throw new JsonException("unsupported request shape"),
-    };
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        object? answer = null;
+        var invocation = NuiCallbackInvocation.InvokeAsync(
+            "ready", new Dictionary<object, object> { ["body"] = "{}" },
+            response => { calls++; answer = response; }, _ => release.Task,
+            NullNuiLogger.Instance);
+
+        Assert.False(invocation.IsCompleted);
+        Assert.Equal(0, calls);
+        release.SetResult();
+        await invocation;
+
+        Assert.Equal(1, calls);
+        Assert.Equal("ok", Property(answer, "code"));
+    }
 
     [Fact]
-    public void SuccessfulHandler_MustAnswer()
+    public async Task Invocation_DoesNotExposeExceptionDetails()
     {
         object? answer = null;
-        var bridge = Bridge(_ => { });
+        await NuiCallbackInvocation.InvokeAsync(
+            "ready", "{}", response => answer = response,
+            _ => throw new InvalidOperationException("internal database password"),
+            NullNuiLogger.Instance);
 
-        bridge(new Dictionary<object, object> { ["body"] = "{}" }, response => answer = response);
-
-        Assert.NotNull(answer);
+        Assert.Equal("handler_error", Property(answer, "code"));
+        Assert.Equal("Callback processing failed.", Property(answer, "message"));
+        Assert.DoesNotContain("password", JsonSerializer.Serialize(answer));
     }
 
-    [Fact]
-    public void AnsweredRequest_MustSatisfyPendingPost()
-    {
-        // Simulates the fetch promise: it settles only when the runtime
-        // receives the response-function call.
-        object? answer = null;
-        var settled = false;
-        var bridge = Bridge(_ => { });
-
-        bridge(
-            new Dictionary<object, object> { ["body"] = "{\"action\":\"loaded\"}" },
-            response =>
-            {
-                answer = response;
-                settled = true;
-            });
-
-        Assert.True(settled, "POST was left pending: the UI would time out");
-        Assert.NotNull(answer);
-    }
-
-    [Fact]
-    public void ThrowingHandler_MustAnswerWithError()
-    {
-        object? answer = null;
-        var bridge = Bridge(_ => throw new InvalidOperationException("boom"));
-
-        bridge(new Dictionary<object, object> { ["body"] = "{}" }, response => answer = response);
-
-        Assert.NotNull(answer);
-    }
-
-    [Fact]
-    public void UnreadableBody_MustAnswer()
-    {
-        object? answer = null;
-        var bridge = Bridge(_ => { });
-
-        bridge(new object(), response => answer = response);
-
-        Assert.NotNull(answer);
-    }
-
-    [Fact]
-    public void EveryPath_MustAnswerExactlyOnce()
-    {
-        foreach (var request in new[]
-                 {
-                     new Dictionary<object, object> { ["body"] = "{}" },
-                     new object(),
-                 })
-        {
-            var calls = 0;
-            var bridge = request is not Dictionary<object, object>
-                ? Bridge(_ => throw new InvalidOperationException("boom"))
-                : Bridge(_ => { });
-
-            bridge(request, _ => calls += 1);
-
-            Assert.Equal(1, calls);
-        }
-    }
+    private static string? Property(object? value, string name) =>
+        value?.GetType().GetProperty(name)?.GetValue(value) as string;
 }

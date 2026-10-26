@@ -1,6 +1,6 @@
 {
   "name": "@fivem-nui/svelte-components",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "UI components for FiveM NUI built on Svelte 5",
   "type": "module",
   "svelte": "./dist/index.js",
@@ -19,8 +19,8 @@
   ],
   "scripts": {
     "build": "svelte-package -i src -o dist",
-    "check": "tsc --noEmit --skipLibCheck --moduleResolution bundler --allowJs --esModuleInterop --strict",
-    "test": "npx --prefix ../bridge vitest run --config ../bridge/vitest.config.ts"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run"
   },
   "keywords": [
     "fivem",
@@ -46,8 +46,8 @@
     "node": ">=22.12.0"
   },
   "peerDependencies": {
-    "@fivem-nui/core": "^1.0.0",
-    "@fivem-nui/svelte": "^1.0.0",
+    "@fivem-nui/core": "^1.1.0",
+    "@fivem-nui/svelte": "^1.1.0",
     "svelte": "^5.20.0"
   },
   "dependencies": {
@@ -55,7 +55,13 @@
   },
   "devDependencies": {
     "@sveltejs/package": "^2.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@vitest/coverage-v8": "^5.0.5",
+    "happy-dom": "^21.0.4",
     "svelte": "^5.20.0",
-    "typescript": "^5.7.3"
+    "svelte-check": "^4.7.7",
+    "typescript": "^5.7.3",
+    "vite": "^6.4.5",
+    "vitest": "^5.0.5"
   }
 }

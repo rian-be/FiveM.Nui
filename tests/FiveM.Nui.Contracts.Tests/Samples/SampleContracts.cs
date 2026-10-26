@@ -2,6 +2,9 @@ using System.Text.Json.Serialization;
 
 namespace FiveM.Nui.Contracts.Tests.Samples;
 
+[NuiContract]
+public sealed record NullableCollections(string?[] ArrayItems, List<string?> ListItems);
+
 /// <summary>
 /// A request to use an inventory item.
 /// </summary>

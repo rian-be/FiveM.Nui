@@ -11,17 +11,17 @@ namespace FiveM.Nui.Callbacks;
 /// Registers raw NUI callbacks and hands the body to a handler as a JSON string.
 /// </summary>
 /// <remarks>
-    /// <para>
-    /// This is the FiveM-specific half of the bridge: the runtime passes the request
-    /// as a dictionary or a <see cref="JsonElement"/> depending on build, so every
-    /// shape is normalised here and the rest of the library only ever sees a string.
-    /// </para>
-    /// <para>
-    /// A throwing handler is logged instead of propagating, because an exception
-    /// escaping into the function reference would break the callback for the rest of
-    /// the session.
-    /// </para>
-    /// </remarks>
+/// <para>
+/// This is the FiveM-specific half of the bridge: the runtime passes the request
+/// as a dictionary or a <see cref="JsonElement"/> depending on build, so every
+/// shape is normalised here and the rest of the library only ever sees a string.
+/// </para>
+/// <para>
+/// A throwing handler is logged instead of propagating, because an exception
+/// escaping into the function reference would break the callback for the rest of
+/// the session.
+/// </para>
+/// </remarks>
 public static class NuiCallbackBridge
 {
     /// <summary>
@@ -69,55 +69,22 @@ public static class NuiCallbackBridge
     /// </remarks>
     public static void Register(string callback, Action<string> handler)
     {
-        void Invoker(object? request, Action<object>? respond)
+        ArgumentNullException.ThrowIfNull(handler);
+        RegisterAsync(callback, body =>
         {
-            string code;
-            string message;
+            handler(body);
+            return Task.CompletedTask;
+        });
+    }
 
-            try
-            {
-                var body = BodyOf(request);
-
-                if (TraceCallbacks)
-                {
-                    Logger.LogInformation(
-                        "callback '{Callback}' ENTER bodyType={Type} bodyLen={Length}",
-                        callback, request?.GetType().FullName ?? "<null>", body.Length);
-                }
-
-                try
-                {
-                    handler(body);
-                    code = "ok";
-                    message = string.Empty;
-                }
-                catch (Exception exception)
-                {
-                    Logger.LogError(exception, "callback '{Callback}' THREW", callback);
-                    code = "handler_error";
-                    message = exception.Message;
-                }
-                finally
-                {
-                    if (TraceCallbacks)
-                    {
-                        Logger.LogInformation("callback '{Callback}' EXIT", callback);
-                    }
-                }
-            }
-            catch (Exception exception)
-            {
-                Logger.LogError(exception,
-                    "callback '{Callback}': could not read body, type={Type}",
-                    callback, request?.GetType().FullName ?? "<null>");
-                code = "bad_request";
-                message = "could not read body";
-            }
-
-            // Exactly one reply: named callbacks have no response contract, the
-            // panel only waits for the POST to complete.
-            Respond(respond, new { code, message });
-        }
+    /// <summary>Registers callback whose ack waits for asynchronous processing.</summary>
+    public static void RegisterAsync(string callback, Func<string, Task> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        // The native boundary requires a void delegate all asynchronous work and
+        // failures are handled inside the awaited invocation.
+        async void Invoker(object? request, Action<object>? respond) =>
+            await NuiCallbackInvocation.InvokeAsync(callback, request, respond, handler, Logger, TraceCallbacks);
 
         Action<object?, Action<object>?> invoker = Invoker;
 
@@ -339,73 +306,4 @@ public static class NuiCallbackBridge
         }
     }
 
-    /// <summary>
-    /// Invokes the runtime reply function, finishing the HTTP request on the NUI side.
-    /// </summary>
-    /// <remarks>
-    /// Exceptions are swallowed: the reply function does not exist when the
-    /// runtime did not pass it through the function reference (e.g. an older
-    /// client). If an exception escaped from here it would abort the callback and
-    /// leave the POST without a reply - exactly the bug this method fixes.
-    /// </remarks>
-    private static void Respond(Action<object>? respond, object payload)
-    {
-        if (respond is null)
-        {
-            return;
-        }
-
-        try
-        {
-            respond(payload);
-        }
-        catch (Exception exception)
-        {
-            Logger.LogWarning(exception, "callback response could not be delivered");
-        }
-    }
-
-    private static string BodyOf(object? request)
-    {
-        if (request is IDictionary<object, object> untyped &&
-            untyped.TryGetValue("body", out var body))
-        {
-            return BodyValue(body);
-        }
-
-        if (request is IDictionary<string, object> typed &&
-            typed.TryGetValue("body", out var typedBody))
-        {
-            return BodyValue(typedBody);
-        }
-
-        if (request is JsonElement element &&
-            element.ValueKind == JsonValueKind.Object &&
-            element.TryGetProperty("body", out var jsonBody))
-        {
-            return BodyValue(jsonBody);
-        }
-
-        if (request is string raw)
-        {
-            return raw;
-        }
-
-        try
-        {
-            return JsonSerializer.Serialize(request);
-        }
-        catch (JsonException)
-        {
-            return string.Empty;
-        }
-    }
-
-    private static string BodyValue(object? body) => body switch
-    {
-        string text => text,
-        JsonElement { ValueKind: JsonValueKind.String } element => element.GetString() ?? string.Empty,
-        JsonElement element => element.GetRawText(),
-        _ => string.Empty,
-    };
 }

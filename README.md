@@ -10,15 +10,15 @@
 
 ---
 
-## 📖 Documentation & Guides
+## Documentation & Guides
 
 Complete technical guides and dedicated role manuals are available in [`docs/`](docs/README.md):
 
-### 🌟 Role Guides
-- 👑 [**Server Owners & Administrators**](docs/server-owners/README.md) — FiveM Enhanced (CoreCLR), `server.cfg` setup, 0.00ms resmon optimization, no cursor freeze, and anti-cheat/DoS protection.
-- 💻 [**Developers & UI Creators**](docs/developers/README.md) — Step-by-step development manual: C# 14 + Svelte 5 Runes, Roslyn automated contracts, 20+ ready UI components, and 10x faster browser workflow in Chrome without starting GTA V.
+### Role Guides
+- [**Server Owners & Administrators**](docs/server-owners/README.md) — FiveM Enhanced (CoreCLR), `server.cfg` setup, 0.00ms resmon optimization, no cursor freeze, and anti-cheat/DoS protection.
+- [**Developers & UI Creators**](docs/developers/README.md) — Step-by-step development manual: C# 14 + Svelte 5 Runes, Roslyn automated contracts, 20+ ready UI components, and 10x faster browser workflow in Chrome without starting GTA V.
 
-### 📚 Technical References
+### Technical References
 | Guide | Description |
 |---|---|
 | [**System Architecture & Scaffolding**](docs/developers/README.md) | Component architecture, event flow, and resource structure. |
@@ -34,22 +34,22 @@ Complete technical guides and dedicated role manuals are available in [`docs/`](
 
 ---
 
-## 💡 Why FiveM.Nui?
+## Why FiveM.Nui?
 
 Traditional FiveM NUI development is plagued by untyped strings, silent network failures, and tedious game restarts:
 
 | The Traditional FiveM Pain | The FiveM.Nui Solution |
 |---|---|
-| ❌ **Untyped String Callbacks** (`RegisterNUICallback("use", ...)` with JSON typos) | ✅ **Compile-Time Type Safety**: TypeScript `NuiEventMap` infers request and response payloads automatically. |
-| ❌ **Input Focus Traps** (`SetNuiFocus` bugs permanently locking cursor or game movement) | ✅ **Managed Window & Focus Stack**: `ShowAsync` and `HideAsync` handle keyboard ownership and state transitions cleanly. |
-| ❌ **Silent Network Hangs** (an unhandled exception in C# leaves frontend `fetch()` pending forever) | ✅ **Structured Error Boundaries**: Every request returns a typed `NuiResult<T>` with timeout deadlines and cancellation tokens. |
-| ❌ **45-Second FiveM Reload Loops** (restarting the game or server just to tweak a CSS button) | ✅ **Instant Local Browser Mocking**: Use `setupNuiMock` in Chrome with Vite HMR — develop 10x faster without launching GTA V! |
-| ❌ **Contract Drift & Double Typing** (manually keeping C# classes and TS interfaces in sync) | ✅ **Automated Roslyn Generator**: Compile your C# assembly and get zero-drift TypeScript interfaces and TSDoc comments. |
-| ❌ **Reinventing Game UI Components** (writing accessible menus, select boxes, and dialogs from scratch) | ✅ **20+ Production UI Components**: Ready-to-use Svelte 5 components hardened specifically for FiveM's CEF runtime. |
+| **Untyped String Callbacks** (`RegisterNUICallback("use", ...)` with JSON typos) | **Compile-Time Type Safety**: TypeScript `NuiEventMap` infers request and response payloads automatically. |
+| **Input Focus Traps** (`SetNuiFocus` bugs permanently locking cursor or game movement) | **Managed Window & Focus Stack**: `ShowAsync` and `HideAsync` handle keyboard ownership and state transitions cleanly. |
+| **Silent Network Hangs** (an unhandled exception in C# leaves frontend `fetch()` pending forever) | **Structured Error Boundaries**: Every request returns a typed `NuiResult<T>` with timeout deadlines and cancellation tokens. |
+| **45-Second FiveM Reload Loops** (restarting the game or server just to tweak a CSS button) | **Instant Local Browser Mocking**: Use `setupNuiMock` in Chrome with Vite HMR — develop 10x faster without launching GTA V! |
+| **Contract Drift & Double Typing** (manually keeping C# classes and TS interfaces in sync) | **Automated Roslyn Generator**: Compile your C# assembly and get zero-drift TypeScript interfaces and TSDoc comments. |
+| **Reinventing Game UI Components** (writing accessible menus, select boxes, and dialogs from scratch) | **20+ Production UI Components**: Ready-to-use Svelte 5 components hardened specifically for FiveM's CEF runtime. |
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 ```mermaid
 graph TD
@@ -83,7 +83,7 @@ graph TD
     CS_ROUT --> CS_GATE
 ```
 
-### 1. 🛡️ Strongly Typed Communication
+### 1. Strongly Typed Communication
 Say goodbye to `dynamic` or hand-cast `Dictionary<string, object>`. C# records implement `INuiRequest<TResponse>`, and TypeScript infers the exact return type:
 
 ```csharp
@@ -96,13 +96,13 @@ public sealed record SpawnVehicleResponse(bool Success, string NetId);
 ```ts
 // Frontend automatically knows parameter and response types!
 const result = await nui.request('garage:spawn', { 
-  VehicleModel: 'banshee', 
-  Plate: 'OUTLAW' 
+  vehicleModel: 'banshee',
+  plate: 'OUTLAW'
 });
-console.log(result.NetId);
+console.log(result.netId);
 ```
 
-### 2. ⚡ Zero-Lag Svelte 5 Runes
+### 2. Zero-Lag Svelte 5 Runes
 Leverage modern Svelte 5 reactivity (`$state`, `$derived`, `$effect`) for instant HUD updates with zero runtime overhead:
 
 ```svelte
@@ -123,7 +123,7 @@ Leverage modern Svelte 5 reactivity (`$state`, `$derived`, `$effect`) for instan
 </div>
 ```
 
-### 3. ⏱️ 10x Faster Development with Browser Mocking
+### 3. 10x Faster Development with Browser Mocking
 Don't wait 45 seconds for FiveM to restart. Test your entire NUI interface directly in your browser with realistic network delays:
 
 ```ts
@@ -142,7 +142,7 @@ if (isBrowser()) {
 }
 ```
 
-### 4. 🪟 Bulletproof Window & Focus Management
+### 4. Bulletproof Window & Focus Management
 Never get your keyboard stuck in NUI again. `NuiGateway` provides reliable window lifecycle hooks:
 
 ```csharp
@@ -168,16 +168,16 @@ public class InventoryScript : BaseScript
 
 ---
 
-## 📦 Packages in this Repository
+## Packages in this Repository
 
 | Package | Version | Description |
 |---|---|---|
-| [**`FiveM.Nui`**](src/) | `1.0.0` | Core C# client library targeting .NET 10. |
-| [**`tools/FiveM.Nui.Contracts`**](tools/FiveM.Nui.Contracts/) | `1.0.0` | Roslyn CLI tool generating TypeScript DTOs and event maps. |
-| [**`@fivem-nui/core`**](packages/fivem-nui/core/) | `1.0.0` | Zero-dependency TypeScript bridge and testing kit. |
+| [**`FiveM.Nui`**](src/) | `1.1.0` | Core C# client library targeting .NET 10. |
+| [**`tools/FiveM.Nui.Contracts`**](tools/FiveM.Nui.Contracts/) | `1.1.0` | Roslyn CLI tool generating TypeScript DTOs and event maps. |
+| [**`@fivem-nui/core`**](packages/fivem-nui/core/) | `1.1.0` | Zero-dependency TypeScript bridge and testing kit. |
 | [**`@fivem-nui/error`**](packages/fivem-nui/error/) | `1.0.0` | Global error handling, stack trace parsing, and exponential retry. |
-| [**`@fivem-nui/svelte`**](packages/svelte/bridge/) | `1.0.0` | Svelte 5 runes (`useNuiState`, `useNuiQuery`) and browser mock. |
-| [**`@fivem-nui/svelte-components`**](packages/svelte/components/) | `1.0.0` | Accessible 20+ component suite designed for FiveM CEF. |
+| [**`@fivem-nui/svelte`**](packages/svelte/bridge/) | `1.1.0` | Svelte 5 runes (`useNuiState`, `useNuiQuery`) and browser mock. |
+| [**`@fivem-nui/svelte-components`**](packages/svelte/components/) | `1.1.0` | Accessible 20+ component suite designed for FiveM CEF. |
 
 ---
 
@@ -191,7 +191,7 @@ dotnet add package FiveM.Nui
 Or add the package reference directly to your `.csproj`:
 ```xml
 <ItemGroup>
-  <PackageReference Include="FiveM.Nui" Version="1.0.0" />
+  <PackageReference Include="FiveM.Nui" Version="1.1.0" />
 </ItemGroup>
 ```
 
@@ -238,14 +238,14 @@ task clean
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions, issues, and feature requests are welcome!  
 Feel free to check out the [Issues tab](https://github.com/rian-be/FiveM.Nui/issues) and our [Architecture Guide](docs/developers/README.md).
 
 ---
 
-## 📄 License
+## License
 
 FiveM.Nui is licensed under the [MIT License](LICENSE).  
 Copyright © 2026 Rian.be.

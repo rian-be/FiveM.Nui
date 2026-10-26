@@ -19,6 +19,9 @@ public sealed class NullNuiLogger : INuiLogger
     {
     }
 
+    /// <inheritdoc />
+    public bool IsEnabled(NuiLogLevel level) => false;
+
     /// <summary>
     /// Discards the debug entry; this logger never writes anything.
     /// </summary>

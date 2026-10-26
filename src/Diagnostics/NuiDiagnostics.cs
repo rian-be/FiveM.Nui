@@ -16,10 +16,16 @@ namespace FiveM.Nui.Diagnostics;
 /// <param name="logger">The logger used by <see cref="LogSnapshot"/>.</param>
 public sealed class NuiDiagnostics(NuiOptions options, INuiLogger logger) : INuiDiagnosticsCollector
 {
+    private const int OperationCapacity = 256;
     private readonly ConcurrentDictionary<string, long> _counters = new();
     private readonly ConcurrentDictionary<string, long> _timings = new();
+    private readonly Queue<NuiDiagnosticOperation> _operations = new(OperationCapacity);
+    private readonly Lock _operationsLock = new();
+    private long _operationSequence;
     private long _totalPayloadSize;
     private long _largestPayload;
+
+    public bool IsEnabled => options.EnableDiagnostics;
 
     /// <summary>
     /// Increments the counter named <paramref name="name"/> by one.
@@ -73,10 +79,39 @@ public sealed class NuiDiagnostics(NuiOptions options, INuiLogger logger) : INui
             return;
         }
 
+        ArgumentOutOfRangeException.ThrowIfNegative(size);
+
         Interlocked.Add(ref _totalPayloadSize, size);
-        if (size > Interlocked.Read(ref _largestPayload))
+        var currentLargest = Interlocked.Read(ref _largestPayload);
+        while (size > currentLargest)
         {
-            Interlocked.Exchange(ref _largestPayload, size);
+            var observed = Interlocked.CompareExchange(ref _largestPayload, size, currentLargest);
+            if (observed == currentLargest)
+            {
+                break;
+            }
+
+            currentLargest = observed;
+        }
+    }
+
+    /// <inheritdoc />
+    public void RecordOperation(NuiDiagnosticOperation operation)
+    {
+        if (!options.EnableDiagnostics)
+        {
+            return;
+        }
+
+        var recorded = operation with { Sequence = Interlocked.Increment(ref _operationSequence) };
+        lock (_operationsLock)
+        {
+            if (_operations.Count == OperationCapacity)
+            {
+                _operations.Dequeue();
+            }
+
+            _operations.Enqueue(recorded);
         }
     }
 
@@ -90,12 +125,19 @@ public sealed class NuiDiagnostics(NuiOptions options, INuiLogger logger) : INui
     /// <returns>A snapshot of the counters, timings, and payload totals at call time.</returns>
     public NuiDiagnosticsSnapshot GetDiagnostics()
     {
+        IReadOnlyList<NuiDiagnosticOperation> operations;
+        lock (_operationsLock)
+        {
+            operations = _operations.ToArray();
+        }
+
         return new NuiDiagnosticsSnapshot
         {
             Counters = new Dictionary<string, long>(_counters),
             Timings = new Dictionary<string, long>(_timings),
             TotalPayloadSize = Interlocked.Read(ref _totalPayloadSize),
-            LargestPayload = Interlocked.Read(ref _largestPayload)
+            LargestPayload = Interlocked.Read(ref _largestPayload),
+            Operations = operations
         };
     }
 
@@ -125,6 +167,11 @@ public sealed class NuiDiagnostics(NuiOptions options, INuiLogger logger) : INui
     {
         _counters.Clear();
         _timings.Clear();
+        lock (_operationsLock)
+        {
+            _operations.Clear();
+        }
+        Interlocked.Exchange(ref _operationSequence, 0);
         Interlocked.Exchange(ref _totalPayloadSize, 0);
         Interlocked.Exchange(ref _largestPayload, 0);
     }

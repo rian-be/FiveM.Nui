@@ -22,75 +22,17 @@ namespace FiveM.Nui.Lifecycle;
 /// </remarks>
 public sealed class NuiStateMachine(INuiLogger? logger = null) : INuiLifecycleMachine
 {
-    /// <summary>
-    /// Legal transitions. Anything absent here is refused.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <c>Created - Ready</c> and <c>Hidden - Ready</c> are the page
-    /// booting on its own, without the host opening window first: inbound
-    /// traffic is proof the page is up, and a resource that never calls
-    /// <c>OpenAsync</c> must still reach a truthful state.
-    /// </para>
-    /// <para>
-    /// <c>Ready - Visible</c> and back are the normal focus cycle;
-    /// <c>Visible|Hidden - Loading</c> covers a page that reloads underneath
-    /// us, which happens when a client reconnects. Every state reaches
-    /// <c>Disposed</c> because a resource can stop at any point, and
-    /// <c>Disposed</c> is terminal - a client that has been disposed must not be
-    /// resurrected, since its cancellation token and pending requests are gone.
-    /// </para>
-    /// <para>
-    /// <c>Ready - Ready</c> is deliberately absent: a late or duplicate
-    /// readiness signal after focus is a symptom worth seeing, not noise to
-    /// absorb. <c>TryTransition</c> still no-ops on a repeat of the current
-    /// state, so only a genuine rewind is reported.
-    /// </para>
-    /// </remarks>
-    private static readonly Dictionary<NuiLifecycleState, NuiLifecycleState[]> Allowed = new()
-    {
-        [NuiLifecycleState.Created] =
-            [NuiLifecycleState.Ready, NuiLifecycleState.Loading, NuiLifecycleState.Disposed],
-        [NuiLifecycleState.Loading] =
-            [NuiLifecycleState.Ready, NuiLifecycleState.Disposed],
-        [NuiLifecycleState.Ready] =
-            [NuiLifecycleState.Visible, NuiLifecycleState.Hidden, NuiLifecycleState.Disposed],
-        [NuiLifecycleState.Visible] =
-            [NuiLifecycleState.Hidden, NuiLifecycleState.Loading, NuiLifecycleState.Disposed],
-        [NuiLifecycleState.Hidden] =
-            [NuiLifecycleState.Visible, NuiLifecycleState.Ready, NuiLifecycleState.Loading,
-             NuiLifecycleState.Disposed],
-        [NuiLifecycleState.Disposed] = []
-    };
-
     private readonly INuiLogger _logger = logger ?? NullNuiLogger.Instance;
-    private readonly Lock _gate = new();
+    private int _current;
 
     /// <summary>
     /// The current state. Safe to read from any thread.
     /// </summary>
     /// <remarks>
-    /// Backed by the C# 14 <see langword="field"/> keyword instead of a
-    /// handwritten <c>_current</c> field; both accessors still take
-    /// <see cref="_gate"/> (which is reentrant), so reads and writes stay atomic.
+    /// Reads are volatile and transitions use compare-exchange, so observers
+    /// always see a complete enum value without taking a lock.
     /// </remarks>
-    public NuiLifecycleState Current
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return field;
-            }
-        }
-        private set
-        {
-            lock (_gate)
-            {
-                field = value;
-            }
-        }
-    }
+    public NuiLifecycleState Current => (NuiLifecycleState)Volatile.Read(ref _current);
 
     /// <summary>
     /// True, once the client has been disposed of. Useful as a guard in long-running
@@ -99,9 +41,8 @@ public sealed class NuiStateMachine(INuiLogger? logger = null) : INuiLifecycleMa
     public bool IsDisposed => Current == NuiLifecycleState.Disposed;
 
     /// <summary>
-    /// Raised after a transition is applied. Handlers run outside the lock, so
-    /// one that throws cannot deadlock the machine, and one that re-enters is
-    /// safe.
+    /// Raised after a transition is applied. Handlers run after the atomic state
+    /// update, so one that throws cannot prevent the transition and re-entry is safe.
     /// </summary>
     public event Action<NuiLifecycleState, NuiLifecycleState>? StateChanged;
 
@@ -113,41 +54,58 @@ public sealed class NuiStateMachine(INuiLogger? logger = null) : INuiLifecycleMa
     /// <param name="reason">Logged at the debug level to explain the transition.</param>
     /// <returns>True when the state changed or was already <paramref name="target"/>.</returns>
     public bool TryTransition(NuiLifecycleState target, string reason = "")
+        => TryTransition(target, reason, repeatedResult: true);
+
+    private bool TryTransition(
+        NuiLifecycleState target,
+        string reason,
+        bool repeatedResult)
     {
         NuiLifecycleState previous;
 
-        lock (_gate)
+        while (true)
         {
-            if (Current == target)
+            previous = Current;
+            if (previous == target)
             {
-                return true;
+                return repeatedResult;
             }
 
-            if (!Allowed.TryGetValue(Current, out var permitted) || !permitted.Contains(target))
+            if (!IsAllowed(previous, target))
             {
-                _logger.LogWarning(
-                    "Refused NUI lifecycle transition {From} -> {To}{Reason}. " +
-                    "The reported state would not match what the runtime did.",
-                    Current, target, string.IsNullOrEmpty(reason) ? "." : $" ({reason})");
+                if (_logger.IsEnabled(NuiLogLevel.Warning))
+                {
+                    _logger.LogWarning(
+                        "Refused NUI lifecycle transition {From} -> {To}{Reason}. " +
+                        "The reported state would not match what the runtime did.",
+                        previous, target, string.IsNullOrEmpty(reason) ? "." : $" ({reason})");
+                }
                 return false;
             }
 
-            previous = Current;
-            Current = target;
+            if (Interlocked.CompareExchange(ref _current, (int)target, (int)previous) == (int)previous)
+                break;
         }
 
-        _logger.LogDebug("NUI lifecycle {From} -> {To}{Reason}",
-            previous, target, string.IsNullOrEmpty(reason) ? "." : $" ({reason})");
-
-        // Outside the lock: a handler that throws must not strand the machine,
-        // and one that re-enters would otherwise deadlock.
-        try
+        if (_logger.IsEnabled(NuiLogLevel.Debug))
         {
-            StateChanged?.Invoke(previous, target);
+            _logger.LogDebug("NUI lifecycle {From} -> {To}{Reason}",
+                previous, target, string.IsNullOrEmpty(reason) ? "." : $" ({reason})");
         }
-        catch (Exception exception)
+
+        // After the atomic update: a handler that throws must not strand the
+        // machine, and a handler may safely re-enter it.
+        foreach (var handler in StateChanged?.GetInvocationList() ?? [])
         {
-            _logger.LogError(exception, "A NuiLifecycleStateChanged handler threw on {To}", target);
+            try
+            {
+                ((Action<NuiLifecycleState, NuiLifecycleState>)handler)(previous, target);
+            }
+            catch (Exception exception)
+            {
+                if (_logger.IsEnabled(NuiLogLevel.Error))
+                    _logger.LogError(exception, "A NuiLifecycleStateChanged handler threw on {To}", target);
+            }
         }
 
         return true;
@@ -186,17 +144,21 @@ public sealed class NuiStateMachine(INuiLogger? logger = null) : INuiLifecycleMa
     /// disposing twice is visible rather than silent.
     /// </summary>
     public bool MarkDisposed(string reason = "client disposed")
-    {
-        lock (_gate)
-        {
-            if (Current == NuiLifecycleState.Disposed)
-            {
-                return false;
-            }
-        }
+        => TryTransition(NuiLifecycleState.Disposed, reason, repeatedResult: false);
 
-        return TryTransition(NuiLifecycleState.Disposed, reason);
-    }
+    /// <summary>
+    /// Defines the legal transition graph without dictionary lookups or arrays
+    /// on the hot path. Any pair absent from this switch is refused.
+    /// </summary>
+    private static bool IsAllowed(NuiLifecycleState from, NuiLifecycleState to) => from switch
+    {
+        NuiLifecycleState.Created => to is NuiLifecycleState.Ready or NuiLifecycleState.Loading or NuiLifecycleState.Disposed,
+        NuiLifecycleState.Loading => to is NuiLifecycleState.Ready or NuiLifecycleState.Disposed,
+        NuiLifecycleState.Ready => to is NuiLifecycleState.Visible or NuiLifecycleState.Hidden or NuiLifecycleState.Disposed,
+        NuiLifecycleState.Visible => to is NuiLifecycleState.Hidden or NuiLifecycleState.Loading or NuiLifecycleState.Disposed,
+        NuiLifecycleState.Hidden => to is NuiLifecycleState.Visible or NuiLifecycleState.Ready or NuiLifecycleState.Loading or NuiLifecycleState.Disposed,
+        _ => false
+    };
 
     /// <summary>
     /// Returns the current state as its name.

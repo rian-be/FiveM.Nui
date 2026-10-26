@@ -7,7 +7,7 @@ import {
   createAbortError,
   type RetryOptions
 } from '@fivem-nui/error';
-import type { SvelteNuiClient } from '../client';
+import type { SvelteNuiClient, UntypedNuiClient } from '../client';
 import { useNuiClient } from '../context';
 
 export { type RetryOptions };
@@ -122,8 +122,8 @@ export class NuiQueryController<TRequest = unknown, TResponse = unknown> impleme
     this.error = null;
     this.called = true;
 
-    const requestFn = () =>
-      this.client.request<TRequest, TResponse>(
+    const requestFn = (): Promise<TResponse> =>
+      (this.client as unknown as UntypedNuiClient).request<TResponse>(
         this.eventName,
         payload,
         overrideTimeout ?? this.options.timeout,

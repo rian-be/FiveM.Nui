@@ -161,4 +161,54 @@ public class NuiClientCorrelationTests
 
         await client.DisposeAsync();
     }
+
+    [Fact]
+    public async Task OversizedPublish_Should_BeRejectedBeforeTransport()
+    {
+        var runtime = new RecordingRuntime();
+        var client = new NuiClient(new NuiOptions { Runtime = runtime, MaxPayloadSize = 80 });
+
+        var ex = Assert.Throws<NuiException>(() => client.Publish("big", new string('ą', 100)));
+
+        Assert.Equal("PAYLOAD_TOO_LARGE", ex.ErrorCode);
+        Assert.Empty(runtime.Sent);
+        await client.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Reconfigure_Should_PreserveCallbacksEventsAndDisposers()
+    {
+        var first = new RecordingRuntime();
+        var second = new RecordingRuntime();
+        var client = new NuiClient(new NuiOptions { Runtime = first });
+        var events = 0;
+        var subscription = client.Subscribe<HealthChanged>("health", _ => events++);
+        client.RegisterCallback<string, string>("echo", (value, _) =>
+            Task.FromResult(NuiResult<string>.Ok(value)));
+
+        client.Reconfigure(new NuiOptions { Runtime = second });
+        client.ReceiveFromNui("""{"type":"event","event":"health","payload":{"health":1}}""");
+        client.ReceiveFromNui("""{"id":"1","type":"request","event":"echo","payload":"ok"}""");
+
+        Assert.Equal(1, events);
+        Assert.Single(second.Sent);
+        Assert.Empty(first.Sent);
+        subscription.Dispose();
+        client.ReceiveFromNui("""{"type":"event","event":"health","payload":{"health":2}}""");
+        Assert.Equal(1, events);
+        await client.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task Dispose_Should_ReleaseFocusAndBeIdempotent()
+    {
+        var runtime = new RecordingRuntime();
+        var client = new NuiClient(new NuiOptions { Runtime = runtime });
+        await client.OpenAsync("panel");
+
+        await client.DisposeAsync();
+        await client.DisposeAsync();
+
+        Assert.Equal(new[] { true, false }, runtime.FocusCalls);
+    }
 }

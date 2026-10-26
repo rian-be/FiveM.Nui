@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace FiveM.Nui.Messaging;
 
 /// <summary>
@@ -42,11 +44,25 @@ internal sealed class NuiInboundHandler(
     public void HandleIncomingMessage(NuiMessage message)
     {
         diagnostics.IncrementCounter("messages_received");
-
-        logger.LogDebug("<- INBOUND type={Type} event='{Event}' id={CorrelationId}",
+        diagnostics.RecordOperation(new NuiDiagnosticOperation(
+            0,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            "inbound",
             message.Type,
             message.Event,
-            message.Id ?? "-");
+            MeasurePayload(message),
+            null,
+            message.Type == "response" && !message.Success ? "failed" : "received",
+            message.Id,
+            message.Error?.Code));
+
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+        {
+            logger.LogDebug("<- INBOUND type={Type} event='{Event}' id={CorrelationId}",
+                message.Type,
+                message.Event,
+                message.Id ?? "-");
+        }
 
         LogPayload("<-", message);
 
@@ -91,52 +107,103 @@ internal sealed class NuiInboundHandler(
             logger.LogWarning("No handler registered for event: {Event}", message.Event);
             diagnostics.IncrementCounter("callbacks_unknown");
 
-            var errorResponse = NuiMessage.CreateResponse(
+            await SendResponseAsync(NuiMessage.CreateResponse(
                 message.Id,
                 false,
-                error: new NuiError("UNKNOWN_CALLBACK", $"No handler for {message.Event}"));
-            await transport.SendAsync(errorResponse, cancellationToken);
+                error: new NuiError("UNKNOWN_CALLBACK", $"No handler for {message.Event}")), message.Event);
             return;
         }
 
         var startedAt = Environment.TickCount64;
+        NuiMessage response;
 
         try
         {
-            logger.LogDebug("Executing callback '{Event}' id={CorrelationId}",
-                message.Event, message.Id);
+            if (logger.IsEnabled(NuiLogLevel.Debug))
+                logger.LogDebug("Executing callback '{Event}' id={CorrelationId}",
+                    message.Event, message.Id);
 
             var responseJson = await handler.ExecuteAsync(message.Payload, serializer, cancellationToken);
-            var response = serializer.Deserialize<NuiMessage>(responseJson);
+            response = serializer.Deserialize<NuiMessage>(responseJson)
+                ?? throw new InvalidOperationException(
+                    $"Callback '{message.Event}' returned an empty response envelope.");
 
-            if (response != null)
-            {
-                response = response with { Id = message.Id };
+            response = response with { Id = message.Id };
 
-                diagnostics.IncrementCounter(response.Success ? "callbacks_succeeded" : "callbacks_failed");
-                diagnostics.RecordTiming($"callback:{message.Event}", Environment.TickCount64 - startedAt);
+            diagnostics.IncrementCounter(response.Success ? "callbacks_succeeded" : "callbacks_failed");
+            var elapsed = Environment.TickCount64 - startedAt;
+            diagnostics.RecordTiming($"callback:{message.Event}", elapsed);
+            diagnostics.RecordOperation(new NuiDiagnosticOperation(
+                0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), "callback", "request", message.Event,
+                0, elapsed, response.Success ? "completed" : "failed", message.Id, response.Error?.Code));
 
+            if (logger.IsEnabled(NuiLogLevel.Debug))
                 logger.LogDebug("Callback '{Event}' id={CorrelationId} finished success={Success} in {Elapsed}ms",
                     message.Event, message.Id, response.Success, Environment.TickCount64 - startedAt);
-
-                await transport.SendAsync(response, cancellationToken);
-            }
-            else
-            {
-                logger.LogError("Callback '{Event}' produced an unserializable response",
-                    message.Event);
-            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (logger.IsEnabled(NuiLogLevel.Debug))
+                logger.LogDebug("Callback '{Event}' id={CorrelationId} stopped because the client is shutting down",
+                    message.Event, message.Id);
+            return;
         }
         catch (Exception ex)
         {
             diagnostics.IncrementCounter("callbacks_threw");
+            diagnostics.RecordOperation(new NuiDiagnosticOperation(
+                0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), "callback", "request", message.Event,
+                0, Environment.TickCount64 - startedAt, "failed", message.Id, ex.GetType().Name));
             logger.LogError(ex, "Error executing callback for event: {Event}", message.Event);
 
-            var errorResponse = NuiMessage.CreateResponse(
+            response = NuiMessage.CreateResponse(
                 message.Id,
                 false,
                 error: new NuiError("CALLBACK_ERROR", "An error occurred processing the request"));
-            await transport.SendAsync(errorResponse, cancellationToken);
+        }
+
+        await SendResponseAsync(response, message.Event);
+    }
+
+    /// <summary>
+    /// Delivers a callback response without allowing a transport failure to
+    /// escape the fire-and-forget inbound dispatch path.
+    /// </summary>
+    private async Task SendResponseAsync(NuiMessage response, string eventName)
+    {
+        try
+        {
+            diagnostics.IncrementCounter("messages_sent");
+
+            if (diagnostics.IsEnabled)
+            {
+                var json = serializer.Serialize(response);
+                var size = Encoding.UTF8.GetByteCount(json);
+                diagnostics.RecordPayload(size);
+                diagnostics.RecordOperation(new NuiDiagnosticOperation(
+                    0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), "outbound", "response", eventName,
+                    size, null, response.Success ? "sent" : "failed", response.Id, response.Error?.Code));
+
+                if (transport is FiveM.Nui.Transport.FiveMNuiTransport fiveMTransport)
+                {
+                    await fiveMTransport.SendSerializedAsync(response, json, cancellationToken);
+                    return;
+                }
+            }
+
+            await transport.SendAsync(response, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (logger.IsEnabled(NuiLogLevel.Debug))
+                logger.LogDebug("Response id={CorrelationId} was not sent because the client is shutting down",
+                    response.Id ?? "-");
+        }
+        catch (Exception ex)
+        {
+            diagnostics.IncrementCounter("callback_responses_failed");
+            logger.LogError(ex, "Failed to send callback response id={CorrelationId}",
+                response.Id ?? "-");
         }
     }
 
@@ -169,7 +236,15 @@ internal sealed class NuiInboundHandler(
         }
 
         diagnostics.IncrementCounter("events_received");
-        eventManager.Publish(message.Event, serializer.Serialize(message.Payload), serializer);
+        var startedAt = Environment.TickCount64;
+        try
+        {
+            eventManager.Publish(message.Event, serializer.Serialize(message.Payload), serializer);
+        }
+        finally
+        {
+            diagnostics.RecordTiming($"event:{message.Event}", Environment.TickCount64 - startedAt);
+        }
     }
 
     /// <summary>
@@ -218,7 +293,11 @@ internal sealed class NuiInboundHandler(
 
         try
         {
-            diagnostics.RecordPayload(serializer.Serialize(message).Length);
+            var size = Encoding.UTF8.GetByteCount(serializer.Serialize(message));
+            diagnostics.RecordPayload(size);
+            diagnostics.RecordOperation(new NuiDiagnosticOperation(
+                0, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), "outbound", message.Type, message.Event,
+                size, null, "sent", message.Id, message.Error?.Code));
         }
         catch (Exception ex)
         {
@@ -226,10 +305,29 @@ internal sealed class NuiInboundHandler(
                 message.Event);
         }
 
-        logger.LogDebug("-> OUTGOING type={Type} event='{Event}' id={CorrelationId}",
-            message.Type, message.Event, message.Id ?? "-");
+        if (logger.IsEnabled(NuiLogLevel.Debug))
+            logger.LogDebug("-> OUTGOING type={Type} event='{Event}' id={CorrelationId}",
+                message.Type, message.Event, message.Id ?? "-");
 
         LogPayload("->", message);
+    }
+
+    private int MeasurePayload(NuiMessage message)
+    {
+        if (!diagnostics.IsEnabled)
+        {
+            return 0;
+        }
+
+        try
+        {
+            return Encoding.UTF8.GetByteCount(serializer.Serialize(message));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not measure inbound payload for '{Event}'", message.Event);
+            return 0;
+        }
     }
 
     /// <summary>
