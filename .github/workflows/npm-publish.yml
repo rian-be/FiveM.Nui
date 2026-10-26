@@ -47,6 +47,9 @@ jobs:
             packages/svelte/bridge/package.json
             packages/svelte/components/package.json
 
+      - name: Upgrade npm for Trusted Publishing (OIDC)
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: |
           echo "Installing dependencies for all packages..."
