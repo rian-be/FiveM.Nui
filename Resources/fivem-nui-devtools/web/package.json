@@ -1,0 +1,26 @@
+{
+  "name": "fivem-nui-devtools-web",
+  "private": true,
+  "version": "1.6.4",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --config vite.config.ts",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fivem-nui/core": "^1.0.0",
+    "@fivem-nui/error": "^1.0.0",
+    "@fivem-nui/svelte": "^1.0.0",
+    "@fivem-nui/svelte-components": "^1.0.0",
+    "esm-env": "^1.0.0",
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@types/node": "^26.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}
