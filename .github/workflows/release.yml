@@ -133,7 +133,7 @@ jobs:
           echo "Building DevTools C# Client..."
           dotnet restore Resources/fivem-nui-devtools/src/Client/FiveM.Nui.DevTools.Client.csproj \
             --source https://api.nuget.org/v3/index.json \
-            --source ./dist
+            --source "${GITHUB_WORKSPACE}/dist"
           dotnet publish Resources/fivem-nui-devtools/src/Client/FiveM.Nui.DevTools.Client.csproj \
             -c Release --no-restore
 
