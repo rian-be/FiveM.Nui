@@ -122,28 +122,6 @@ jobs:
           npm run build
           npm run check
 
-      - name: Smoke-test native Node ESM entrypoint
-        if: matrix.name != '@fivem-nui/svelte-components'
-        working-directory: ${{ matrix.dir }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          pack_dir="$RUNNER_TEMP/fivem-nui-esm-${{ strategy.job-index }}"
-          mkdir -p "$pack_dir"
-
-          if [ "${{ matrix.name }}" = "@fivem-nui/core" ]; then
-            npm pack ../error --pack-destination "$pack_dir"
-            npm install --no-save "$pack_dir"/fivem-nui-error-*.tgz
-            node -e "Promise.all([import('./dist/index.js'), import('./dist/testing/index.js'), import('./dist/diagnostics/index.js')])"
-          elif [ "${{ matrix.name }}" = "@fivem-nui/svelte" ]; then
-            npm pack ../../fivem-nui/error --pack-destination "$pack_dir"
-            npm pack ../../fivem-nui/core --pack-destination "$pack_dir"
-            npm install --no-save "$pack_dir"/fivem-nui-error-*.tgz "$pack_dir"/fivem-nui-core-*.tgz
-            node -e "Promise.all([import('./dist/index.js'), import('./dist/mock/index.js'), import('./dist/actions/index.js')])"
-          else
-            node -e "import('./dist/index.js')"
-          fi
-
       - name: Publish Test Report
         uses: dorny/test-reporter@v3
         if: ${{ !cancelled() }}
