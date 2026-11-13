@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="CitizenFX.FiveM.Client" Version="0.0.4-alpha" />
-    <PackageReference Include="MessagePack" Version="3.1.7" />
+    <PackageReference Include="MessagePack" Version="3.1.9" />
     <PackageReference Include="FiveM.Nui" Version="1.*" />
   </ItemGroup>
 </Project>
